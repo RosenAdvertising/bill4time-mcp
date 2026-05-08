@@ -17,7 +17,7 @@ dependencies = [
 
 [project.scripts]
 bill4time-mcp = "bill4time_mcp.server:main"
-bill4time-mcp-setup = "bill4time_mcp.setup.oauth_flow:main"
+bill4time-mcp-setup = "bill4time_mcp.setup.setup_wizard:main"
 bill4time-mcp-verify = "bill4time_mcp.setup.verify:main"
 
 [project.urls]

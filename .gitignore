@@ -13,8 +13,8 @@ venv/
 
 # Secrets — never commit
 .env
-*.json
-!pyproject.toml
+.env.*
+!.env.example
 
 # IDE
 .DS_Store
