@@ -1,5 +1,9 @@
 # bill4time-mcp
 
+[![PyPI version](https://img.shields.io/pypi/v/bill4time-mcp.svg)](https://pypi.org/project/bill4time-mcp/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 MCP server for [Bill4Time](https://bill4time.com) — API coverage for legal billing and time tracking. Use Bill4Time from Claude Desktop with natural language.
 
 ## What you can do
