@@ -28,6 +28,23 @@ _load_env()
 API_KEY = os.environ.get("BILL4TIME_API_KEY", "")
 
 
+def _retry_after_seconds(resp, default=10):
+    try:
+        return int(resp.headers.get("Retry-After", default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _json_response(resp):
+    try:
+        return resp.json()
+    except ValueError:
+        raise RuntimeError(
+            f"Bill4Time API returned non-JSON response ({resp.status_code}): "
+            f"{resp.text[:200]}"
+        )
+
+
 class Bill4TimeClient:
     def __init__(self):
         if not API_KEY:
@@ -41,13 +58,13 @@ class Bill4TimeClient:
         for attempt in range(3):
             resp = self.session.get(url, params=params)
             if resp.status_code == 429:
-                retry_after = int(resp.headers.get("Retry-After", 10))
+                retry_after = _retry_after_seconds(resp)
                 print(f"Rate limited. Waiting {retry_after}s...", file=sys.stderr)
                 time.sleep(retry_after)
                 continue
             if not resp.ok:
                 raise RuntimeError(f"Bill4Time API error {resp.status_code}: {resp.text[:400]}")
-            return resp.json()
+            return _json_response(resp)
         raise RuntimeError("Max retries exceeded")
 
     def _build_params(self, filter_expr: str = "", top: int = 0, skip: int = 0,
