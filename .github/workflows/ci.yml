@@ -37,7 +37,7 @@ jobs:
     if: ${{ hashFiles('pyproject.toml') != '' || hashFiles('requirements.txt') != '' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v7
       - name: Set up Python
         run: uv python install 3.12
       - name: Install deps
