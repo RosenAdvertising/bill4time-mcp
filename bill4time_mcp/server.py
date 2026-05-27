@@ -35,6 +35,7 @@ def _call(fn, *args, **kwargs) -> str:
 
 # ── Clients ────────────────────────────────────────────────────────────────────
 
+
 @mcp.tool()
 def list_clients(
     filter_expr: str = "",
@@ -66,6 +67,7 @@ def list_disabled_clients(top: int = 0) -> str:
 
 
 # ── Projects ───────────────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 def list_projects(
@@ -111,6 +113,7 @@ def list_projects_by_billing_method(billing_method: str, top: int = 0) -> str:
 
 # ── Time Entries ───────────────────────────────────────────────────────────────
 
+
 @mcp.tool()
 def list_time_entries(
     filter_expr: str = "",
@@ -154,7 +157,9 @@ def list_time_entries_for_invoice(invoice_id: int) -> str:
 
 
 @mcp.tool()
-def list_time_entries_for_date_range(start_date: str, end_date: str, top: int = 0) -> str:
+def list_time_entries_for_date_range(
+    start_date: str, end_date: str, top: int = 0
+) -> str:
     """List time entries within a date range (YYYY-MM-DD format)."""
     return _call(_c().list_time_entries_by_date_range, start_date, end_date, top)
 
@@ -167,6 +172,7 @@ def list_time_entries_by_billing_status(billing_status: str, top: int = 0) -> st
 
 
 # ── Expenses ───────────────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 def list_expenses(
@@ -211,6 +217,7 @@ def list_expenses_for_date_range(start_date: str, end_date: str, top: int = 0) -
 
 
 # ── Invoices ───────────────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 def list_invoices(
@@ -280,6 +287,7 @@ def list_invoices_for_date_range(start_date: str, end_date: str, top: int = 0) -
 
 # ── Payments ───────────────────────────────────────────────────────────────────
 
+
 @mcp.tool()
 def list_payments(
     filter_expr: str = "",
@@ -318,6 +326,7 @@ def list_payments_for_date_range(start_date: str, end_date: str, top: int = 0) -
 
 # ── Payments Applied ───────────────────────────────────────────────────────────
 
+
 @mcp.tool()
 def list_payments_applied(
     filter_expr: str = "",
@@ -349,12 +358,15 @@ def list_payments_applied_for_payment(payment_id: int) -> str:
 
 
 @mcp.tool()
-def list_payments_applied_for_date_range(start_date: str, end_date: str, top: int = 0) -> str:
+def list_payments_applied_for_date_range(
+    start_date: str, end_date: str, top: int = 0
+) -> str:
     """List payments-applied within a date range (YYYY-MM-DD format)."""
     return _call(_c().list_payments_applied_by_date_range, start_date, end_date, top)
 
 
 # ── Users ──────────────────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 def list_users(filter_expr: str = "", top: int = 0) -> str:
@@ -369,6 +381,7 @@ def get_user(user_id: int) -> str:
 
 
 # ── Contacts ───────────────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 def list_contacts(
@@ -402,6 +415,7 @@ def list_contacts_for_date_range(start_date: str, end_date: str, top: int = 0) -
 
 # ── Contact Connections ────────────────────────────────────────────────────────
 
+
 @mcp.tool()
 def list_contact_connections(filter_expr: str = "", top: int = 0) -> str:
     """List all contact connections. Use filter_expr for OData filtering."""
@@ -427,6 +441,7 @@ def list_contact_connections_for_project(project_id: int) -> str:
 
 
 # ── Trust Accounting ───────────────────────────────────────────────────────────
+
 
 @mcp.tool()
 def list_trust_records(
@@ -459,7 +474,9 @@ def list_trust_records_for_project(project_id: int, top: int = 0) -> str:
 
 
 @mcp.tool()
-def list_trust_records_for_date_range(start_date: str, end_date: str, top: int = 0) -> str:
+def list_trust_records_for_date_range(
+    start_date: str, end_date: str, top: int = 0
+) -> str:
     """List trust records created within a date range (YYYY-MM-DD format)."""
     return _call(_c().list_trust_records_by_date_range, start_date, end_date, top)
 

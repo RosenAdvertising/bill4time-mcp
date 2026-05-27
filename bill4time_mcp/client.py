@@ -63,12 +63,21 @@ class Bill4TimeClient:
                 time.sleep(retry_after)
                 continue
             if not resp.ok:
-                raise RuntimeError(f"Bill4Time API error {resp.status_code}: {resp.text[:400]}")
+                raise RuntimeError(
+                    f"Bill4Time API error {resp.status_code}: {resp.text[:400]}"
+                )
             return _json_response(resp)
         raise RuntimeError("Max retries exceeded")
 
-    def _build_params(self, filter_expr: str = "", top: int = 0, skip: int = 0,
-                      orderby: str = "", select: str = "", count: bool = False) -> dict:
+    def _build_params(
+        self,
+        filter_expr: str = "",
+        top: int = 0,
+        skip: int = 0,
+        orderby: str = "",
+        select: str = "",
+        count: bool = False,
+    ) -> dict:
         params = {}
         if filter_expr:
             params["$filter"] = filter_expr
@@ -97,51 +106,93 @@ class Bill4TimeClient:
 
     # ── Clients ───────────────────────────────────────────────────────────────
 
-    def list_clients(self, filter_expr: str = "", top: int = 0, skip: int = 0,
-                     orderby: str = "", select: str = ""):
-        return self._get("clients", self._build_params(filter_expr, top, skip, orderby, select))
+    def list_clients(
+        self,
+        filter_expr: str = "",
+        top: int = 0,
+        skip: int = 0,
+        orderby: str = "",
+        select: str = "",
+    ):
+        return self._get(
+            "clients", self._build_params(filter_expr, top, skip, orderby, select)
+        )
 
     def get_client(self, client_id: int):
         return self._get("clients", {"$filter": f"id eq {client_id}"})
 
     def list_clients_by_status(self, status: str, top: int = 0, orderby: str = ""):
-        return self._get("clients", self._build_params(
-            f"status eq {self._odata_str(status)}", top, orderby=orderby))
+        return self._get(
+            "clients",
+            self._build_params(
+                f"status eq {self._odata_str(status)}", top, orderby=orderby
+            ),
+        )
 
     # ── Projects ──────────────────────────────────────────────────────────────
 
-    def list_projects(self, filter_expr: str = "", top: int = 0, skip: int = 0,
-                      orderby: str = "", select: str = ""):
-        return self._get("projects", self._build_params(filter_expr, top, skip, orderby, select))
+    def list_projects(
+        self,
+        filter_expr: str = "",
+        top: int = 0,
+        skip: int = 0,
+        orderby: str = "",
+        select: str = "",
+    ):
+        return self._get(
+            "projects", self._build_params(filter_expr, top, skip, orderby, select)
+        )
 
     def get_project(self, project_id: int):
         return self._get("projects", {"$filter": f"id eq {project_id}"})
 
     def list_projects_by_client(self, client_id: int, top: int = 0):
-        return self._get("projects", self._build_params(f"clientId eq {client_id}", top))
+        return self._get(
+            "projects", self._build_params(f"clientId eq {client_id}", top)
+        )
 
     def list_projects_by_status(self, status: str, top: int = 0, orderby: str = ""):
-        return self._get("projects", self._build_params(
-            f"status eq {self._odata_str(status)}", top, orderby=orderby))
+        return self._get(
+            "projects",
+            self._build_params(
+                f"status eq {self._odata_str(status)}", top, orderby=orderby
+            ),
+        )
 
     def list_projects_by_billing_method(self, billing_method: str, top: int = 0):
-        return self._get("projects", self._build_params(
-            f"billingMethod eq {self._odata_str(billing_method)}", top))
+        return self._get(
+            "projects",
+            self._build_params(
+                f"billingMethod eq {self._odata_str(billing_method)}", top
+            ),
+        )
 
     # ── Time Entries ──────────────────────────────────────────────────────────
 
-    def list_time_entries(self, filter_expr: str = "", top: int = 0, skip: int = 0,
-                          orderby: str = "", select: str = ""):
-        return self._get("timeEntries", self._build_params(filter_expr, top, skip, orderby, select))
+    def list_time_entries(
+        self,
+        filter_expr: str = "",
+        top: int = 0,
+        skip: int = 0,
+        orderby: str = "",
+        select: str = "",
+    ):
+        return self._get(
+            "timeEntries", self._build_params(filter_expr, top, skip, orderby, select)
+        )
 
     def get_time_entry(self, entry_id: int):
         return self._get("timeEntries", {"$filter": f"id eq {entry_id}"})
 
     def list_time_entries_by_client(self, client_id: int, top: int = 0):
-        return self._get("timeEntries", self._build_params(f"clientId eq {client_id}", top))
+        return self._get(
+            "timeEntries", self._build_params(f"clientId eq {client_id}", top)
+        )
 
     def list_time_entries_by_project(self, project_id: int, top: int = 0):
-        return self._get("timeEntries", self._build_params(f"projectId eq {project_id}", top))
+        return self._get(
+            "timeEntries", self._build_params(f"projectId eq {project_id}", top)
+        )
 
     def list_time_entries_by_user(self, user_id: int, top: int = 0):
         return self._get("timeEntries", self._build_params(f"userId eq {user_id}", top))
@@ -149,30 +200,50 @@ class Bill4TimeClient:
     def list_time_entries_by_invoice(self, invoice_id: int):
         return self._get("timeEntries", {"$filter": f"invoiceId eq {invoice_id}"})
 
-    def list_time_entries_by_date_range(self, start_date: str, end_date: str, top: int = 0):
+    def list_time_entries_by_date_range(
+        self, start_date: str, end_date: str, top: int = 0
+    ):
         start = self._parse_date(start_date)
         end = self._parse_date(end_date)
-        return self._get("timeEntries", self._build_params(
-            f"entryDate ge '{start}' AND entryDate le '{end}'", top))
+        return self._get(
+            "timeEntries",
+            self._build_params(f"entryDate ge '{start}' AND entryDate le '{end}'", top),
+        )
 
     def list_time_entries_by_billing_status(self, billing_status: str, top: int = 0):
-        return self._get("timeEntries", self._build_params(
-            f"billingStatus eq {self._odata_str(billing_status)}", top))
+        return self._get(
+            "timeEntries",
+            self._build_params(
+                f"billingStatus eq {self._odata_str(billing_status)}", top
+            ),
+        )
 
     # ── Expenses ──────────────────────────────────────────────────────────────
 
-    def list_expenses(self, filter_expr: str = "", top: int = 0, skip: int = 0,
-                      orderby: str = "", select: str = ""):
-        return self._get("expenses", self._build_params(filter_expr, top, skip, orderby, select))
+    def list_expenses(
+        self,
+        filter_expr: str = "",
+        top: int = 0,
+        skip: int = 0,
+        orderby: str = "",
+        select: str = "",
+    ):
+        return self._get(
+            "expenses", self._build_params(filter_expr, top, skip, orderby, select)
+        )
 
     def get_expense(self, expense_id: int):
         return self._get("expenses", {"$filter": f"id eq {expense_id}"})
 
     def list_expenses_by_client(self, client_id: int, top: int = 0):
-        return self._get("expenses", self._build_params(f"clientId eq {client_id}", top))
+        return self._get(
+            "expenses", self._build_params(f"clientId eq {client_id}", top)
+        )
 
     def list_expenses_by_project(self, project_id: int, top: int = 0):
-        return self._get("expenses", self._build_params(f"projectId eq {project_id}", top))
+        return self._get(
+            "expenses", self._build_params(f"projectId eq {project_id}", top)
+        )
 
     def list_expenses_by_invoice(self, invoice_id: int):
         return self._get("expenses", {"$filter": f"invoiceId eq {invoice_id}"})
@@ -180,65 +251,112 @@ class Bill4TimeClient:
     def list_expenses_by_date_range(self, start_date: str, end_date: str, top: int = 0):
         start = self._parse_date(start_date)
         end = self._parse_date(end_date)
-        return self._get("expenses", self._build_params(
-            f"expenseDate ge '{start}' AND expenseDate le '{end}'", top))
+        return self._get(
+            "expenses",
+            self._build_params(
+                f"expenseDate ge '{start}' AND expenseDate le '{end}'", top
+            ),
+        )
 
     # ── Invoices ──────────────────────────────────────────────────────────────
 
-    def list_invoices(self, filter_expr: str = "", top: int = 0, skip: int = 0,
-                      orderby: str = "", select: str = ""):
-        return self._get("invoices", self._build_params(filter_expr, top, skip, orderby, select))
+    def list_invoices(
+        self,
+        filter_expr: str = "",
+        top: int = 0,
+        skip: int = 0,
+        orderby: str = "",
+        select: str = "",
+    ):
+        return self._get(
+            "invoices", self._build_params(filter_expr, top, skip, orderby, select)
+        )
 
     def get_invoice(self, invoice_id: int):
         return self._get("invoices", {"$filter": f"id eq {invoice_id}"})
 
     def list_invoices_by_client(self, client_id: int, top: int = 0):
-        return self._get("invoices", self._build_params(f"clientId eq {client_id}", top))
+        return self._get(
+            "invoices", self._build_params(f"clientId eq {client_id}", top)
+        )
 
     def list_invoices_by_project(self, project_id: int, top: int = 0):
-        return self._get("invoices", self._build_params(f"projectId eq {project_id}", top))
+        return self._get(
+            "invoices", self._build_params(f"projectId eq {project_id}", top)
+        )
 
     def list_invoices_by_status(self, status: str, top: int = 0):
-        return self._get("invoices", self._build_params(
-            f"status eq {self._odata_str(status)}", top))
+        return self._get(
+            "invoices", self._build_params(f"status eq {self._odata_str(status)}", top)
+        )
 
     def list_invoices_by_paid_status(self, paid_status: str, top: int = 0):
-        return self._get("invoices", self._build_params(
-            f"paidStatus eq {self._odata_str(paid_status)}", top))
+        return self._get(
+            "invoices",
+            self._build_params(f"paidStatus eq {self._odata_str(paid_status)}", top),
+        )
 
     def list_invoices_by_date_range(self, start_date: str, end_date: str, top: int = 0):
         start = self._parse_date(start_date)
         end = self._parse_date(end_date)
-        return self._get("invoices", self._build_params(
-            f"invoiceDate ge '{start}' AND invoiceDate le '{end}'", top))
+        return self._get(
+            "invoices",
+            self._build_params(
+                f"invoiceDate ge '{start}' AND invoiceDate le '{end}'", top
+            ),
+        )
 
     # ── Payments ──────────────────────────────────────────────────────────────
 
-    def list_payments(self, filter_expr: str = "", top: int = 0, skip: int = 0,
-                      orderby: str = "", select: str = ""):
-        return self._get("payments", self._build_params(filter_expr, top, skip, orderby, select))
+    def list_payments(
+        self,
+        filter_expr: str = "",
+        top: int = 0,
+        skip: int = 0,
+        orderby: str = "",
+        select: str = "",
+    ):
+        return self._get(
+            "payments", self._build_params(filter_expr, top, skip, orderby, select)
+        )
 
     def get_payment(self, payment_id: int):
         return self._get("payments", {"$filter": f"id eq {payment_id}"})
 
     def list_payments_by_client(self, client_id: int, top: int = 0):
-        return self._get("payments", self._build_params(f"clientId eq {client_id}", top))
+        return self._get(
+            "payments", self._build_params(f"clientId eq {client_id}", top)
+        )
 
     def list_payments_by_project(self, project_id: int, top: int = 0):
-        return self._get("payments", self._build_params(f"projectId eq {project_id}", top))
+        return self._get(
+            "payments", self._build_params(f"projectId eq {project_id}", top)
+        )
 
     def list_payments_by_date_range(self, start_date: str, end_date: str, top: int = 0):
         start = self._parse_date(start_date)
         end = self._parse_date(end_date)
-        return self._get("payments", self._build_params(
-            f"paymentDate ge '{start}' AND paymentDate le '{end}'", top))
+        return self._get(
+            "payments",
+            self._build_params(
+                f"paymentDate ge '{start}' AND paymentDate le '{end}'", top
+            ),
+        )
 
     # ── Payments Applied ──────────────────────────────────────────────────────
 
-    def list_payments_applied(self, filter_expr: str = "", top: int = 0, skip: int = 0,
-                              orderby: str = "", select: str = ""):
-        return self._get("paymentsApplied", self._build_params(
-            filter_expr, top, skip, orderby, select))
+    def list_payments_applied(
+        self,
+        filter_expr: str = "",
+        top: int = 0,
+        skip: int = 0,
+        orderby: str = "",
+        select: str = "",
+    ):
+        return self._get(
+            "paymentsApplied",
+            self._build_params(filter_expr, top, skip, orderby, select),
+        )
 
     def get_payment_applied(self, record_id: int):
         return self._get("paymentsApplied", {"$filter": f"id eq {record_id}"})
@@ -249,11 +367,17 @@ class Bill4TimeClient:
     def list_payments_applied_by_payment(self, payment_id: int):
         return self._get("paymentsApplied", {"$filter": f"paymentId eq {payment_id}"})
 
-    def list_payments_applied_by_date_range(self, start_date: str, end_date: str, top: int = 0):
+    def list_payments_applied_by_date_range(
+        self, start_date: str, end_date: str, top: int = 0
+    ):
         start = self._parse_date(start_date)
         end = self._parse_date(end_date)
-        return self._get("paymentsApplied", self._build_params(
-            f"dateApplied ge '{start}' AND dateApplied le '{end}'", top))
+        return self._get(
+            "paymentsApplied",
+            self._build_params(
+                f"dateApplied ge '{start}' AND dateApplied le '{end}'", top
+            ),
+        )
 
     # ── Users ─────────────────────────────────────────────────────────────────
 
@@ -265,22 +389,35 @@ class Bill4TimeClient:
 
     # ── Contacts ──────────────────────────────────────────────────────────────
 
-    def list_contacts(self, filter_expr: str = "", top: int = 0, skip: int = 0,
-                      orderby: str = "", select: str = ""):
-        return self._get("contacts", self._build_params(filter_expr, top, skip, orderby, select))
+    def list_contacts(
+        self,
+        filter_expr: str = "",
+        top: int = 0,
+        skip: int = 0,
+        orderby: str = "",
+        select: str = "",
+    ):
+        return self._get(
+            "contacts", self._build_params(filter_expr, top, skip, orderby, select)
+        )
 
     def get_contact(self, contact_id: int):
         return self._get("contacts", {"$filter": f"id eq {contact_id}"})
 
     def list_contacts_by_status(self, status: str, top: int = 0):
-        return self._get("contacts", self._build_params(
-            f"status eq {self._odata_str(status)}", top))
+        return self._get(
+            "contacts", self._build_params(f"status eq {self._odata_str(status)}", top)
+        )
 
     def list_contacts_by_date_range(self, start_date: str, end_date: str, top: int = 0):
         start = self._parse_date(start_date)
         end = self._parse_date(end_date)
-        return self._get("contacts", self._build_params(
-            f"creationDate ge '{start}' AND creationDate le '{end}'", top))
+        return self._get(
+            "contacts",
+            self._build_params(
+                f"creationDate ge '{start}' AND creationDate le '{end}'", top
+            ),
+        )
 
     # ── Contact Connections ───────────────────────────────────────────────────
 
@@ -288,32 +425,54 @@ class Bill4TimeClient:
         return self._get("contactConnections", self._build_params(filter_expr, top))
 
     def list_contact_connections_by_contact(self, contact_id: int):
-        return self._get("contactConnections", {"$filter": f"contactId eq {contact_id}"})
+        return self._get(
+            "contactConnections", {"$filter": f"contactId eq {contact_id}"}
+        )
 
     def list_contact_connections_by_client(self, client_id: int):
         return self._get("contactConnections", {"$filter": f"clientId eq {client_id}"})
 
     def list_contact_connections_by_project(self, project_id: int):
-        return self._get("contactConnections", {"$filter": f"projectId eq {project_id}"})
+        return self._get(
+            "contactConnections", {"$filter": f"projectId eq {project_id}"}
+        )
 
     # ── Trust Accounting ──────────────────────────────────────────────────────
 
-    def list_trust_records(self, filter_expr: str = "", top: int = 0, skip: int = 0,
-                           orderby: str = "", select: str = ""):
-        return self._get("trustAccounting", self._build_params(
-            filter_expr, top, skip, orderby, select))
+    def list_trust_records(
+        self,
+        filter_expr: str = "",
+        top: int = 0,
+        skip: int = 0,
+        orderby: str = "",
+        select: str = "",
+    ):
+        return self._get(
+            "trustAccounting",
+            self._build_params(filter_expr, top, skip, orderby, select),
+        )
 
     def get_trust_record(self, record_id: int):
         return self._get("trustAccounting", {"$filter": f"id eq {record_id}"})
 
     def list_trust_records_by_client(self, client_id: int, top: int = 0):
-        return self._get("trustAccounting", self._build_params(f"clientId eq {client_id}", top))
+        return self._get(
+            "trustAccounting", self._build_params(f"clientId eq {client_id}", top)
+        )
 
     def list_trust_records_by_project(self, project_id: int, top: int = 0):
-        return self._get("trustAccounting", self._build_params(f"projectId eq {project_id}", top))
+        return self._get(
+            "trustAccounting", self._build_params(f"projectId eq {project_id}", top)
+        )
 
-    def list_trust_records_by_date_range(self, start_date: str, end_date: str, top: int = 0):
+    def list_trust_records_by_date_range(
+        self, start_date: str, end_date: str, top: int = 0
+    ):
         start = self._parse_date(start_date)
         end = self._parse_date(end_date)
-        return self._get("trustAccounting", self._build_params(
-            f"dateCreated ge '{start}' AND dateCreated le '{end}'", top))
+        return self._get(
+            "trustAccounting",
+            self._build_params(
+                f"dateCreated ge '{start}' AND dateCreated le '{end}'", top
+            ),
+        )

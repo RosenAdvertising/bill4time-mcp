@@ -11,7 +11,7 @@ def main():
     try:
         client = Bill4TimeClient()
         users = client.list_users(top=1)
-        print(f"✓ Connected. Sample response:")
+        print("✓ Connected. Sample response:")
         print(json.dumps(users, indent=2))
     except Exception as e:
         print(f"✗ Verification failed: {e}")

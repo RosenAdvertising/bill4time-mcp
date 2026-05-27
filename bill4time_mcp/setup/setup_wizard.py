@@ -49,13 +49,11 @@ def main():
     print(f"✓ Config saved to {CONFIG_DIR}")
     print()
     print("Add to your Claude Desktop config:")
-    print(json.dumps({
-        "mcpServers": {
-            "bill4time": {
-                "command": "bill4time-mcp"
-            }
-        }
-    }, indent=2))
+    print(
+        json.dumps(
+            {"mcpServers": {"bill4time": {"command": "bill4time-mcp"}}}, indent=2
+        )
+    )
 
 
 if __name__ == "__main__":
