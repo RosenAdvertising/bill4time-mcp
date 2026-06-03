@@ -53,7 +53,7 @@ class Bill4TimeClient:
         self.session.headers.update({"Accept": "application/json"})
         self._api_url = f"{BASE}/{API_KEY}/v1"
 
-    def _get(self, resource: str, params: dict = None):
+    def _get(self, resource: str, params: dict | None = None):
         url = f"{self._api_url}/{resource}"
         for attempt in range(3):
             resp = self.session.get(url, params=params)

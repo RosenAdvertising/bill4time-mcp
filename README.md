@@ -65,7 +65,7 @@ bill4time-mcp-verify
 
 Bill4Time uses an API key embedded directly in the URL path:
 
-```
+```text
 https://secure.bill4time.com/b4t-api/{api_key}/v1/{resource}
 ```
 
@@ -75,7 +75,7 @@ No OAuth or token refresh required. Create API keys from **Settings → API** in
 
 All `list_*` tools accept a `filter_expr` parameter for advanced filtering:
 
-```
+```text
 "status eq 'Active'"
 "clientId eq 751"
 "invoiceDate ge '2024-01-01' AND invoiceDate le '2024-12-31'"
@@ -89,13 +89,13 @@ Use `top` to limit results, `orderby` to sort, `skip` for pagination.
 ## Example usage in Claude
 
 > "Show all unpaid invoices"
-
+>
 > "List time entries for project 456 this month"
-
+>
 > "Get all payments received from client 123 in 2024"
-
+>
 > "Show trust account activity for client 789"
-
+>
 > "List open projects ordered by project name"
 
 ## License
