@@ -481,6 +481,114 @@ def list_trust_records_for_date_range(
     return _call(_c().list_trust_records_by_date_range, start_date, end_date, top)
 
 
+# ── Resources ─────────────────────────────────────────────────────────────────
+
+
+@mcp.resource("bill4time://active_clients", mime_type="application/json")
+def active_clients_resource() -> str:
+    """Active clients from Bill4Time — read-only reference data."""
+    return _call(_c().list_clients_by_status, "Active", 50)
+
+
+@mcp.resource("bill4time://users", mime_type="application/json")
+def users_resource() -> str:
+    """Bill4Time users (timekeeper list) — read-only reference data."""
+    return _call(_c().list_users, "", 50)
+
+
+@mcp.resource("bill4time://security-notes", mime_type="text/markdown")
+def security_notes_resource() -> str:
+    """Security posture documentation for this Bill4Time MCP server."""
+    return """\
+# Bill4Time MCP — Security Notes
+
+## API key in URL path (vendor design)
+
+The Bill4Time REST API embeds the API key directly in the URL path:
+`https://secure.bill4time.com/b4t-api/{API_KEY}/v1/...`
+
+This is a vendor design decision, not a configurable option. Consequences:
+
+- **Any proxy, log aggregator, load balancer, or HTTP access log** that records
+  full request URLs will capture the API key in plaintext.
+- **HTTPS mitigates passive eavesdropping** — the URL path is encrypted in transit
+  — but does not protect against log exposure at the origin or proxy layer.
+
+**Operational guidance:**
+- Ensure that web server access logs, reverse-proxy logs (nginx, Cloudflare, etc.),
+  and any observability pipeline (Datadog, Splunk, etc.) either redact URL paths
+  or are access-controlled to the same degree as the key itself.
+- Rotate the API key if you suspect it has been captured in logs accessible to
+  unauthorized parties.
+- This MCP does not log request URLs. The `BILL4TIME_API_KEY` env var is resolved
+  at startup via the pluggable credentials store (OS keyring -> `.env`) and embedded
+  in `self._api_url` on the client instance; it is never written to stdout/stderr.
+
+## Read-only access
+
+All tools in this MCP are read-only (GET requests only). There are no write,
+create, or delete operations. The blast radius of a compromised API key is
+limited to data exposure, not data modification.
+
+## Authentication
+
+`BILL4TIME_API_KEY` is loaded via the pluggable credentials store. It is never
+logged or echoed by this server.
+"""
+
+
+# ── Prompts ───────────────────────────────────────────────────────────────────
+
+
+@mcp.prompt()
+def unbilled_time_report(start_date: str, end_date: str) -> str:
+    """Report on unbilled time entries for a date range — billing status review workflow."""
+    return f"""Generate an unbilled time report for {start_date} to {end_date}.
+
+1. Call list_time_entries_for_date_range('{start_date}', '{end_date}').
+2. Filter results to entries where billingStatus is 'Ready For Summary' or 'Ready For Billing'.
+3. Group by client/project:
+   - Client name
+   - Project name
+   - Total hours unbilled
+   - Attorney/user responsible (userId)
+4. Sort by total unbilled hours descending.
+5. Flag any entry where billingStatus is 'Pending Project Close' — these may be at risk of not being billed.
+6. Summary row: total unbilled hours, estimated revenue (if rates available), date range covered.
+7. Recommend which clients to invoice first based on unbilled hours and project status."""
+
+
+@mcp.prompt()
+def client_billing_summary(client_id: int) -> str:
+    """Full billing picture for a single client: projects, time, invoices, payments."""
+    return f"""Build a billing summary for client ID {client_id}.
+
+1. get_client({client_id}) — confirm client name and status.
+2. list_projects_for_client({client_id}) — list all matters/projects.
+3. list_time_entries_for_client({client_id}) — total hours by project.
+4. list_invoices_for_client({client_id}) — outstanding invoice amounts and paid status.
+5. list_payments_for_client({client_id}) — payments received.
+6. Compute: total billed, total paid, outstanding balance.
+7. For each project: hours logged, billed, unbilled.
+8. Flag: unpaid invoices older than 30 days, open projects with no recent time entries."""
+
+
+@mcp.prompt()
+def trust_account_review(client_id: int) -> str:
+    """Review trust accounting records for a client — compliance-oriented workflow."""
+    return f"""Review trust account for client ID {client_id}.
+
+1. list_trust_records_for_client({client_id}) — all trust transactions.
+2. Separate deposits from disbursements (check transaction type field).
+3. Compute running balance chronologically.
+4. Flag:
+   - Any disbursement that would overdraw the trust account.
+   - Trust balance below $0 at any point.
+   - Large disbursements without a corresponding invoice.
+5. Cross-reference with list_invoices_for_client({client_id}) to confirm disbursements match billed work.
+6. Output: transaction log table, current trust balance, any compliance flags."""
+
+
 def main():
     mcp.run()
 
