@@ -1,0 +1,119 @@
+tools:
+  - name: list_clients
+    read_write: read
+  - name: get_client
+    read_write: read
+  - name: list_active_clients
+    read_write: read
+  - name: list_disabled_clients
+    read_write: read
+  - name: list_projects
+    read_write: read
+  - name: get_project
+    read_write: read
+  - name: list_projects_for_client
+    read_write: read
+  - name: list_open_projects
+    read_write: read
+  - name: list_closed_projects
+    read_write: read
+  - name: list_projects_by_billing_method
+    read_write: read
+  - name: list_time_entries
+    read_write: read
+  - name: get_time_entry
+    read_write: read
+  - name: list_time_entries_for_client
+    read_write: read
+  - name: list_time_entries_for_project
+    read_write: read
+  - name: list_time_entries_for_user
+    read_write: read
+  - name: list_time_entries_for_invoice
+    read_write: read
+  - name: list_time_entries_for_date_range
+    read_write: read
+  - name: list_time_entries_by_billing_status
+    read_write: read
+  - name: list_expenses
+    read_write: read
+  - name: get_expense
+    read_write: read
+  - name: list_expenses_for_client
+    read_write: read
+  - name: list_expenses_for_project
+    read_write: read
+  - name: list_expenses_for_invoice
+    read_write: read
+  - name: list_expenses_for_date_range
+    read_write: read
+  - name: list_invoices
+    read_write: read
+  - name: get_invoice
+    read_write: read
+  - name: list_invoices_for_client
+    read_write: read
+  - name: list_invoices_for_project
+    read_write: read
+  - name: list_prebill_invoices
+    read_write: read
+  - name: list_finalized_invoices
+    read_write: read
+  - name: list_unpaid_invoices
+    read_write: read
+  - name: list_partially_paid_invoices
+    read_write: read
+  - name: list_paid_invoices
+    read_write: read
+  - name: list_invoices_for_date_range
+    read_write: read
+  - name: list_payments
+    read_write: read
+  - name: get_payment
+    read_write: read
+  - name: list_payments_for_client
+    read_write: read
+  - name: list_payments_for_project
+    read_write: read
+  - name: list_payments_for_date_range
+    read_write: read
+  - name: list_payments_applied
+    read_write: read
+  - name: get_payment_applied
+    read_write: read
+  - name: list_payments_applied_for_invoice
+    read_write: read
+  - name: list_payments_applied_for_payment
+    read_write: read
+  - name: list_payments_applied_for_date_range
+    read_write: read
+  - name: list_users
+    read_write: read
+  - name: get_user
+    read_write: read
+  - name: list_contacts
+    read_write: read
+  - name: get_contact
+    read_write: read
+  - name: list_active_contacts
+    read_write: read
+  - name: list_contacts_for_date_range
+    read_write: read
+  - name: list_contact_connections
+    read_write: read
+  - name: list_contact_connections_for_contact
+    read_write: read
+  - name: list_contact_connections_for_client
+    read_write: read
+  - name: list_contact_connections_for_project
+    read_write: read
+  - name: list_trust_records
+    read_write: read
+  - name: get_trust_record
+    read_write: read
+  - name: list_trust_records_for_client
+    read_write: read
+  - name: list_trust_records_for_project
+    read_write: read
+  - name: list_trust_records_for_date_range
+    read_write: read

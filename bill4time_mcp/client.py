@@ -6,24 +6,13 @@ import sys
 import time
 import requests
 from datetime import date
-from pathlib import Path
 
-CONFIG_DIR = Path.home() / ".bill4time-mcp"
+from bill4time_mcp import credentials
+
 BASE = "https://secure.bill4time.com/b4t-api"
 
-
-def _load_env():
-    env_file = CONFIG_DIR / ".env"
-    if env_file.exists():
-        with open(env_file) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key, val = line.split("=", 1)
-                    os.environ.setdefault(key.strip(), val.strip())
-
-
-_load_env()
+# Resolve credentials through the pluggable store (OS keyring -> .env file).
+credentials.load_into_environ(["BILL4TIME_API_KEY"])
 
 API_KEY = os.environ.get("BILL4TIME_API_KEY", "")
 
