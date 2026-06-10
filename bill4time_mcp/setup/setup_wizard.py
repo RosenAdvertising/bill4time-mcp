@@ -2,12 +2,11 @@
 """Bill4Time MCP setup — API key configuration."""
 
 import json
-import os
 import sys
 import requests
-from pathlib import Path
 
-CONFIG_DIR = Path.home() / ".bill4time-mcp"
+from bill4time_mcp import credentials
+
 BASE = "https://secure.bill4time.com/b4t-api"
 
 
@@ -40,13 +39,12 @@ def main():
         print(f"✗ Failed: {e}")
         sys.exit(1)
 
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    backend = credentials.set_secret("BILL4TIME_API_KEY", api_key)
 
-    env_file = CONFIG_DIR / ".env"
-    env_file.write_text(f"# Bill4Time MCP configuration\nBILL4TIME_API_KEY={api_key}\n")
-    os.chmod(env_file, 0o600)
-
-    print(f"✓ Config saved to {CONFIG_DIR}")
+    if backend == "keyring":
+        print(f"✓ API key saved to the OS keyring ({credentials.storage_backend()}).")
+    else:
+        print(f"✓ API key saved to {credentials.ENV_FILE} (0600).")
     print()
     print("Add to your Claude Desktop config:")
     print(
