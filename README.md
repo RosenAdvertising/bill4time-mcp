@@ -41,13 +41,42 @@ pip install bill4time-mcp
 bill4time-mcp-setup
 ```
 
-This prompts for your API key and tests the connection. Credentials saved to `~/.bill4time-mcp/`.
+This prompts for your API key and tests the connection.
 
 Verify:
 
 ```bash
 bill4time-mcp-verify
 ```
+
+### Credential storage
+
+By default the API key is stored in your operating system's native secret store
+via the cross-platform [`keyring`](https://github.com/jaraco/keyring) library:
+
+| OS      | Backend                                  |
+| ------- | ---------------------------------------- |
+| macOS   | Keychain                                 |
+| Windows | Credential Manager                       |
+| Linux   | Secret Service (GNOME Keyring / KWallet) |
+
+The secret is saved under the service name `bill4time-mcp`. Nothing is written to
+disk in clear text.
+
+**File fallback.** On a host with no keyring backend (e.g. a headless Linux box
+without Secret Service), or if you set `BILL4TIME_MCP_USE_KEYRING=0`, the key
+falls back to a `~/.bill4time-mcp/.env` file with `0600` permissions.
+
+**Read order.** The key resolves in the order OS keyring → process environment →
+`.env` file. So a rotated key in the keyring always wins, and a
+`BILL4TIME_API_KEY` exported in your shell overrides the file fallback without
+touching the keyring.
+
+**Pluggable backend.** `keyring` lets you point at any secret store. For example,
+install [`keyrings.cryptfile`](https://pypi.org/project/keyrings.cryptfile/) for
+an encrypted file backend, or a cloud backend, then select it with the standard
+`PYTHON_KEYRING_BACKEND` environment variable or a `keyringrc.cfg`. See the
+[keyring configuration docs](https://github.com/jaraco/keyring#configuring).
 
 ## Claude Desktop Configuration
 
