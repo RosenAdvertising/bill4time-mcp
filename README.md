@@ -113,7 +113,10 @@ All `list_*` tools accept a `filter_expr` parameter for advanced filtering:
 
 Supported operators: `eq`, `ne`, `gt`, `ge`, `lt`, `le`
 
-Use `top` to limit results, `orderby` to sort, `skip` for pagination.
+Every list tool defaults to 50 records and an explicit deterministic sort
+(`id desc`, except the alphabetical open-project view). Use `top` to choose a
+total result cap from 1 through 200, `orderby` to override the sort, and `skip`
+for pagination on the general collection tools.
 
 ## Example usage in Claude
 
