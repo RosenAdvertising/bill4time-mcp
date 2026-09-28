@@ -24,6 +24,7 @@ All resources support OData-style filtering via `filter_expr` parameter for adva
 ## Requirements
 
 - Python 3.10+
+- Python MCP SDK >=2.2,<3
 - Claude Desktop (or any MCP-compatible client)
 - Bill4Time API key (create in Settings → API tab)
 
