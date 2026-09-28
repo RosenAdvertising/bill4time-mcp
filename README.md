@@ -19,7 +19,7 @@ MCP server for [Bill4Time](https://bill4time.com) — API coverage for legal bil
 - **Contacts** — list by status, date range, contact connections
 - **Trust Accounting** — list trust records by client, project, date range
 
-All resources support OData-style filtering via `filter_expr` parameter for advanced queries.
+General collection list tools support OData-style filtering via `filter_expr` for advanced queries.
 
 ## Requirements
 
@@ -103,7 +103,7 @@ No OAuth or token refresh required. Create API keys from **Settings → API** in
 
 ## OData Filtering
 
-All `list_*` tools accept a `filter_expr` parameter for advanced filtering:
+General collection list tools accept a `filter_expr` parameter for advanced filtering:
 
 ```text
 "status eq 'Active'"
@@ -133,7 +133,7 @@ for pagination on the general collection tools.
 
 ## Security note
 
-**API key in URL path.** Bill4Time's API design embeds the API key directly as a path segment in every request URL (`/b4t-api/{api_key}/v1/...`). This is a Bill4Time API architecture constraint — the MCP loads your key from a local env file and never commits it to this repository. However, the key-in-URL design has the following implications you should be aware of:
+**API key in URL path.** Bill4Time's API design embeds the API key directly as a path segment in every request URL (`/b4t-api/{api_key}/v1/...`). This is a Bill4Time API architecture constraint. The MCP resolves the key from the OS keyring, process environment, or a local file fallback; it never logs the key. However, the key-in-URL design has the following implications you should be aware of:
 
 - **Server/proxy access logs** on any machine between your client and Bill4Time's servers will record the full request URL, including the API key, for the duration of their log retention policy.
 - **Network monitoring tools** that capture request URLs (e.g. HTTP proxies, security appliances, debugging tools) will expose the key in logged URLs.
