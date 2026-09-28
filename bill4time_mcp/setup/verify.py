@@ -1,9 +1,13 @@
-#!/usr/bin/env python3
 """Verify Bill4Time MCP credentials."""
 
-import json
+import logging
 import sys
+
+import requests
+
 from bill4time_mcp.client import Bill4TimeClient
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -11,9 +15,10 @@ def main():
     try:
         client = Bill4TimeClient()
         users = client.list_users(top=1)
-        print("✓ Connected. Sample response:")
-        print(json.dumps(users, indent=2))
-    except Exception as e:
+        count = len(users) if isinstance(users, list) else "OK"
+        print(f"✓ Connected. Users returned: {count}")
+    except (RuntimeError, ValueError, requests.RequestException) as e:
+        logger.warning("credential_verification_rejected reason=%s", type(e).__name__)
         print(f"✗ Verification failed: {e}")
         sys.exit(1)
 

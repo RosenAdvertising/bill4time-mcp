@@ -1,13 +1,15 @@
-#!/usr/bin/env python3
 """Bill4Time MCP setup — API key configuration."""
 
 import json
+import logging
 import sys
+
 import requests
 
 from bill4time_mcp import credentials
 
 BASE = "https://secure.bill4time.com/b4t-api"
+logger = logging.getLogger(__name__)
 
 
 def test_api_key(api_key: str) -> dict:
@@ -15,7 +17,10 @@ def test_api_key(api_key: str) -> dict:
     resp = requests.get(url, headers={"Accept": "application/json"}, params={"$top": 1})
     if resp.status_code == 200:
         return resp.json()
-    raise RuntimeError(f"API test failed ({resp.status_code}): {resp.text[:200]}")
+    logger.warning(
+        "setup_api_key_rejected reason=vendor_http_error status=%s", resp.status_code
+    )
+    raise RuntimeError(f"API test failed ({resp.status_code})")
 
 
 def main():
@@ -26,6 +31,7 @@ def main():
 
     api_key = input("API Key (UUID): ").strip()
     if not api_key:
+        logger.warning("setup_api_key_rejected reason=empty_input")
         print("API key is required.")
         sys.exit(1)
 

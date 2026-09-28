@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Pluggable credential storage for bill4time-mcp.
 
 Secrets (API keys, tokens, passwords) are stored in the operating system's
@@ -24,9 +23,12 @@ See https://github.com/jaraco/keyring#configuring for details.
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # --- per-MCP configuration --------------------------------------------------
 SERVICE_NAME = "bill4time-mcp"
@@ -48,6 +50,7 @@ try:  # pragma: no cover - import guard
     keyring = _keyring_mod
     _KEYRING_IMPORTED = True
 except Exception:  # noqa: BLE001 - any import failure means "no keyring"
+    logger.info("keyring_disabled reason=import_failure")
     keyring = None
     KeyringError = Exception
     _KEYRING_IMPORTED = False
@@ -64,16 +67,19 @@ def _keyring_enabled() -> bool:
         return False
     flag = os.environ.get(_USE_KEYRING_FLAG, "1").strip().lower()
     if flag in ("0", "false", "no", "off"):
+        logger.info("keyring_disabled reason=explicit_opt_out")
         return False
     try:
         backend = keyring.get_keyring()
     except Exception:  # noqa: BLE001
+        logger.warning("keyring_disabled reason=backend_lookup_failure")
         return False
     # keyring.backends.fail.Keyring / .null.Keyring are non-functional sentinels.
     cls = backend.__class__.__module__ + "." + backend.__class__.__name__
-    if "fail." in cls or "null." in cls:
-        return False
-    return True
+    enabled = not ("fail." in cls or "null." in cls)
+    if not enabled:
+        logger.info("keyring_disabled reason=sentinel_backend")
+    return enabled
 
 
 def _read_env_file() -> dict[str, str]:
@@ -95,13 +101,13 @@ def _write_env_file(values: dict[str, str]) -> None:
     try:
         CONFIG_DIR.chmod(0o700)
     except OSError:
-        pass
+        logger.warning("credential_permissions_not_applied target=config_directory")
     lines = [f"{k}={v}" for k, v in values.items()]
     ENV_FILE.write_text("\n".join(lines) + ("\n" if lines else ""))
     try:
         ENV_FILE.chmod(0o600)
     except OSError:
-        pass
+        logger.warning("credential_permissions_not_applied target=env_file")
 
 
 def get_secret(key: str, default: str = "") -> str:
@@ -118,7 +124,7 @@ def get_secret(key: str, default: str = "") -> str:
             if val:
                 return val
         except KeyringError:
-            pass  # fall through to file/env
+            logger.warning("credential_read_fallback reason=keyring_error")
     # process env set by the parent shell takes next precedence
     env_val = os.environ.get(key)
     if env_val:
@@ -147,7 +153,7 @@ def set_secret(key: str, value: str) -> str:
                 _write_env_file(existing)
             return "keyring"
         except KeyringError:
-            pass  # fall back to file
+            logger.warning("credential_write_fallback reason=keyring_error")
     existing = _read_env_file()
     existing[key] = value
     _write_env_file(existing)
@@ -160,7 +166,7 @@ def delete_secret(key: str) -> None:
         try:
             keyring.delete_password(SERVICE_NAME, key)
         except Exception:  # noqa: BLE001 - missing entry is fine
-            pass
+            logger.info("credential_delete_skipped reason=keyring_entry_unavailable")
     existing = _read_env_file()
     if key in existing:
         existing.pop(key, None)
@@ -188,5 +194,6 @@ def storage_backend() -> str:
         try:
             return keyring.get_keyring().__class__.__name__
         except Exception:  # noqa: BLE001
+            logger.warning("keyring_name_fallback reason=backend_lookup_failure")
             return "keyring"
     return f"file ({ENV_FILE})"
