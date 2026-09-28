@@ -1,5 +1,11 @@
 # MCP 2026-07-28 migration report
 
+> **Merge status (2026-09-28):** This report records the original spec branch.
+> The `v2-2026-09-28` merge candidate retains main's required
+> `mcp>=1.28.1,<2` dependency and resolves `mcp==1.30.0`. Its MCP 2 imports and
+> protocol tests fail during collection, so the candidate is blocked and the
+> successful spec-branch checks below do not describe this merged branch.
+
 ## Result
 
 `bill4time-mcp` now targets MCP `2026-07-28`, up from `2025-11-25`.
