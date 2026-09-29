@@ -14,7 +14,12 @@ logger = logging.getLogger(__name__)
 
 def test_api_key(api_key: str) -> dict:
     url = f"{BASE}/{api_key}/v1/users"
-    resp = requests.get(url, headers={"Accept": "application/json"}, params={"$top": 1})
+    resp = requests.get(
+        url,
+        headers={"Accept": "application/json"},
+        params={"$top": 1},
+        timeout=15,
+    )
     if resp.status_code == 200:
         return resp.json()
     logger.warning(
