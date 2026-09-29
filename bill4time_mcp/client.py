@@ -99,7 +99,9 @@ class Bill4TimeClient:
     def _get(self, resource: str, params: dict | None = None):
         url = f"{self._api_url}/{quote(str(resource), safe='')}"
         try:
-            resp = self.session.get(url, params=params, timeout=REQUEST_TIMEOUT)
+            resp = self.session.get(
+                url, params=params, timeout=REQUEST_TIMEOUT, allow_redirects=False
+            )
         except requests.RequestException as exc:
             logger.warning("bill4time_request_failed reason=transport_error")
             raise SafeToolFailure(
@@ -117,7 +119,7 @@ class Bill4TimeClient:
                 else "Retry later."
             )
             raise SafeToolFailure(f"Bill4Time rate limit reached. {hint}")
-        if not resp.ok:
+        if not resp.ok or 300 <= resp.status_code < 400:
             logger.warning(
                 "bill4time_request_rejected reason=vendor_http_error status=%s",
                 resp.status_code,

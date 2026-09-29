@@ -146,6 +146,7 @@ def test_read_transport_failure_is_safe_and_has_timeout(monkeypatch, caplog, fai
 
     def fail(url, **kwargs):
         assert kwargs["timeout"] == client_module.REQUEST_TIMEOUT
+        assert kwargs["allow_redirects"] is False
         raise failure(f"{PRIVATE} /b4t-api/key-secret/v1/users")
 
     monkeypatch.setattr(session, "get", fail)
@@ -164,6 +165,28 @@ def test_path_segment_is_quoted_without_encoding_whole_path():
     client, session = _client_with_stub_session()
     client._get("../x")
     assert session.calls[0][0].endswith("/..%2Fx")
+
+
+def test_redirect_response_is_not_reported_as_success():
+    client, session = _client_with_stub_session()
+
+    class RedirectResponse:
+        status_code = 302
+        ok = True
+        headers = {"Location": "https://attacker.invalid/"}
+
+        def json(self):
+            return {"message": PRIVATE}
+
+    def redirect(url, **kwargs):
+        assert kwargs["allow_redirects"] is False
+        return RedirectResponse()
+
+    session.get = redirect
+    with pytest.raises(SafeToolFailure) as raised:
+        client.list_clients()
+    assert str(raised.value) == "Bill4Time returned HTTP 302: request failed"
+    assert PRIVATE not in str(raised.value)
 
 
 def test_retry_after_large_hint_is_preserved_without_sleep(monkeypatch):
@@ -316,5 +339,18 @@ def test_api_key_path_is_escaped(monkeypatch):
     setup_wizard.test_api_key("../x")
     assert calls[0][0].endswith("/..%2Fx/v1/users")
     assert calls[0][1]["timeout"] == 15
+    assert calls[0][1]["allow_redirects"] is False
     monkeypatch.setattr(client_module, "API_KEY", "../x")
     assert client_module.Bill4TimeClient()._api_url.endswith("/..%2Fx/v1")
+
+
+def test_fallback_credential_file_is_created_private(monkeypatch, tmp_path):
+    from bill4time_mcp import credentials
+
+    config_dir = tmp_path / "private-config"
+    env_file = config_dir / ".env"
+    monkeypatch.setattr(credentials, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr(credentials, "ENV_FILE", env_file)
+    credentials._write_env_file({"BILL4TIME_API_KEY": "fake-token"})
+    assert env_file.read_text() == "BILL4TIME_API_KEY=fake-token\n"
+    assert env_file.stat().st_mode & 0o777 == 0o600

@@ -22,6 +22,7 @@ def test_api_key(api_key: str) -> dict:
         headers={"Accept": "application/json"},
         params={"$top": 1},
         timeout=15,
+        allow_redirects=False,
     )
     if resp.status_code == 200:
         return resp.json()

@@ -103,7 +103,9 @@ def _write_env_file(values: dict[str, str]) -> None:
     except OSError:
         logger.warning("credential_permissions_not_applied target=config_directory")
     lines = [f"{k}={v}" for k, v in values.items()]
-    ENV_FILE.write_text("\n".join(lines) + ("\n" if lines else ""))
+    fd = os.open(ENV_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as env_file:
+        env_file.write("\n".join(lines) + ("\n" if lines else ""))
     try:
         ENV_FILE.chmod(0o600)
     except OSError:
