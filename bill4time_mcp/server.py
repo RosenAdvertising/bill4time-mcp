@@ -2,23 +2,94 @@
 
 import json
 import logging
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 from mcp.server.mcpserver import MCPServer
-from pydantic import Field
+from mcp.server.mcpserver.context import Context
+from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
+from mcp.shared.exceptions import MCPError
+from mcp_types import CallToolResult, TextContent
+from pydantic import Field, ValidationError
 
 from bill4time_mcp.client import (
     DEFAULT_LIST_LIMIT,
     DEFAULT_ORDERBY,
     MAX_LIST_LIMIT,
     Bill4TimeClient,
+    SafeToolFailure,
 )
 
 logger = logging.getLogger(__name__)
+
+
+class SafeMCPServer(MCPServer):
+    """Keep the SDK's schemas while sanitizing its tool error boundary."""
+
+    async def _handle_call_tool(self, ctx, params):
+        context = Context(
+            request_context=ctx,
+            mcp_server=self,
+            input_params=params,
+            subscriptions=self._subscriptions,
+        )
+        try:
+            return await self.call_tool(params.name, params.arguments or {}, context)
+        except MCPError:
+            raise
+        except Exception as exc:
+            if isinstance(exc, ToolError) and not isinstance(exc, UnexpectedToolError):
+                cause = exc.__cause__
+                if isinstance(cause, SafeToolFailure):
+                    text = str(exc)
+                    logger.info("tool_call_failed reason=expected_failure")
+                elif isinstance(cause, ValidationError):
+                    fields = sorted(
+                        {
+                            str(e["loc"][0]) if e["loc"] else "argument"
+                            for e in cast(Any, cause).errors()
+                        }
+                    )
+                    tool = self._tool_manager.get_tool(params.name)
+                    properties = tool.parameters.get("properties", {}) if tool else {}
+                    field_name = (
+                        fields[0] if fields and fields[0] in properties else "argument"
+                    )
+                    shape = _argument_shape(params.name, field_name)
+                    text = f"Error executing tool {params.name}: Argument {field_name} {shape}."
+                    logger.info("tool_call_failed reason=invalid_arguments")
+                else:
+                    text = f"Error executing tool {params.name}"
+                    logger.error("tool_call_failed reason=unexpected_exception")
+            else:
+                text = f"Error executing tool {params.name}"
+                logger.error("tool_call_failed reason=unexpected_exception")
+            return CallToolResult(
+                content=[TextContent(type="text", text=text)], is_error=True
+            )
+
+
+def _argument_shape(tool_name: str, field_name: str) -> str:
+    tool = mcp._tool_manager.get_tool(tool_name)
+    prop = (tool.parameters.get("properties", {}) if tool else {}).get(field_name, {})
+    expected = prop.get("type", "valid input")
+    if expected == "integer":
+        constraint = (
+            " from 1 to 200"
+            if field_name == "top"
+            else " greater than or equal to 0"
+            if field_name == "skip"
+            else ""
+        )
+        return f"must be an integer{constraint}"
+    if expected == "string":
+        return "must be a string"
+    return f"must match the expected {expected} shape"
+
+
 ListLimit = Annotated[int, Field(ge=1, le=MAX_LIST_LIMIT)]
 ListOffset = Annotated[int, Field(ge=0)]
 
-mcp = MCPServer(
+mcp = SafeMCPServer(
     "bill4time",
     instructions=(
         "Bill4Time legal billing. Read-only access to clients, projects, time entries, "
@@ -40,12 +111,8 @@ def _c() -> Bill4TimeClient:
 
 
 def _call(fn, *args, **kwargs) -> str:
-    """Invoke a client method, returning a JSON error string on failure."""
-    try:
-        return json.dumps(fn(*args, **kwargs), indent=2)
-    except (ValueError, RuntimeError) as e:
-        logger.warning("tool_call_rejected reason=%s", type(e).__name__)
-        return json.dumps({"error": str(e)})
+    """Invoke a client method; expected failures are safe MCP tool errors."""
+    return json.dumps(fn(*args, **kwargs), indent=2)
 
 
 # ── Clients ────────────────────────────────────────────────────────────────────

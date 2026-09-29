@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx2
+import pytest
 from mcp import Client
 from mcp.types import LATEST_PROTOCOL_VERSION
 from mcp_types.version import MODERN_PROTOCOL_VERSIONS
@@ -261,3 +262,135 @@ def test_modern_http_requires_routing_headers_and_uses_revised_errors() -> None:
         "message": "Method not found",
         "data": "example/unknown",
     }
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected"),
+    [
+        (
+            "missing",
+            "Error executing tool list_clients: Missing BILL4TIME_API_KEY. Set it or run bill4time-mcp-setup.",
+        ),
+        (
+            "auth",
+            "Error executing tool list_clients: Bill4Time authorization was rejected or expired. Reauthorize with bill4time-mcp-setup.",
+        ),
+        (
+            "http",
+            "Error executing tool list_clients: Bill4Time returned HTTP 500: request failed",
+        ),
+        (
+            "rate",
+            "Error executing tool list_clients: Bill4Time rate limit reached. Retry after about 7 seconds.",
+        ),
+        (
+            "invalid",
+            "Error executing tool list_clients: Argument top must be an integer from 1 to 200.",
+        ),
+        (
+            "not_found",
+            "Error executing tool get_client: Bill4Time resource was not found. Check the requested record.",
+        ),
+    ],
+)
+def test_known_failures_are_actionable_tool_results(
+    monkeypatch, failure, expected
+) -> None:
+    from bill4time_mcp.client import SafeToolFailure
+
+    class FakeClient:
+        def list_clients(self, *_args):
+            raise SafeToolFailure(
+                {
+                    "missing": "Missing BILL4TIME_API_KEY. Set it or run bill4time-mcp-setup.",
+                    "auth": "Bill4Time authorization was rejected or expired. Reauthorize with bill4time-mcp-setup.",
+                    "http": "Bill4Time returned HTTP 500: request failed",
+                    "rate": "Bill4Time rate limit reached. Retry after about 7 seconds.",
+                }[failure]
+            )
+
+        def get_client(self, *_args):
+            raise SafeToolFailure(
+                "Bill4Time resource was not found. Check the requested record."
+            )
+
+    monkeypatch.setattr(server, "_client", FakeClient())
+    name = "get_client" if failure == "not_found" else "list_clients"
+    arguments = (
+        {"client_id": 987654}
+        if name == "get_client"
+        else {"top": 999}
+        if failure == "invalid"
+        else {}
+    )
+    result = _result(
+        asyncio.run(_post_modern("tools/call", {"name": name, "arguments": arguments}))
+    )
+    assert result["isError"] is True
+    assert result["content"][0]["text"] == expected
+
+
+def test_schema_and_unexpected_errors_are_sanitized(monkeypatch, caplog) -> None:
+    import logging
+
+    schema = _result(
+        asyncio.run(
+            _post_modern(
+                "tools/call",
+                {
+                    "name": "list_clients",
+                    "arguments": {"top": "person@example.invalid"},
+                },
+            )
+        )
+    )
+    assert schema["isError"] is True
+    assert (
+        schema["content"][0]["text"]
+        == "Error executing tool list_clients: Argument top must be an integer from 1 to 200."
+    )
+    assert "person@example.invalid" not in schema["content"][0]["text"]
+
+    class ExplodingClient:
+        def list_clients(self, *_args):
+            raise RuntimeError(
+                "customer@example.invalid secret-key=https://vendor.invalid/key/abc"
+            )
+
+    monkeypatch.setattr(server, "_client", ExplodingClient())
+    with caplog.at_level(logging.ERROR):
+        result = _result(
+            asyncio.run(
+                _post_modern("tools/call", {"name": "list_clients", "arguments": {}})
+            )
+        )
+    assert result["isError"] is True
+    assert result["content"][0]["text"] == "Error executing tool list_clients"
+    assert "customer@example.invalid" not in caplog.text
+    assert "vendor.invalid" not in caplog.text
+
+
+def test_date_validation_names_expected_format_through_dispatch(monkeypatch) -> None:
+    from bill4time_mcp.client import SafeToolFailure
+
+    class InvalidDateClient:
+        def list_time_entries_by_date_range(self, *_args):
+            raise SafeToolFailure("Argument start_date must use YYYY-MM-DD format.")
+
+    monkeypatch.setattr(server, "_client", InvalidDateClient())
+    result = _result(
+        asyncio.run(
+            _post_modern(
+                "tools/call",
+                {
+                    "name": "list_time_entries_for_date_range",
+                    "arguments": {"start_date": "not-a-date", "end_date": "2026-01-01"},
+                },
+            )
+        )
+    )
+    assert result["isError"] is True
+    assert (
+        result["content"][0]["text"]
+        == "Error executing tool list_time_entries_for_date_range: Argument start_date must use YYYY-MM-DD format."
+    )

@@ -12,7 +12,7 @@ import pytest
 import requests
 
 from bill4time_mcp import server
-from bill4time_mcp.client import Bill4TimeClient
+from bill4time_mcp.client import Bill4TimeClient, SafeToolFailure
 
 
 class StubResponse:
@@ -33,6 +33,23 @@ class StubSession:
         return StubResponse()
 
 
+class ErrorResponse:
+    ok = False
+    status_code = 500
+    headers: dict[str, str] = {}
+
+    def json(self):
+        return {
+            "message": "customer@example.invalid key=private-secret",
+            "code": "customer@example.invalid",
+        }
+
+
+class ErrorSession:
+    def get(self, _url, params=None):
+        return ErrorResponse()
+
+
 def _client_with_stub_session() -> tuple[Bill4TimeClient, StubSession]:
     client = Bill4TimeClient.__new__(Bill4TimeClient)
     session = StubSession()
@@ -50,14 +67,46 @@ def test_vendor_response_is_capped_and_order_is_forwarded() -> None:
     assert session.calls[0][1] == {"$top": 2, "$orderby": "id desc"}
 
 
+def test_vendor_error_reason_uses_allowlist_and_falls_back_safely() -> None:
+    client = Bill4TimeClient.__new__(Bill4TimeClient)
+    client.session = cast(requests.Session, ErrorSession())
+    client._api_url = "https://example.invalid/keyed-secret/v1"
+
+    with pytest.raises(SafeToolFailure, match="HTTP 500: request failed") as raised:
+        client.list_clients()
+    assert "customer@example.invalid" not in str(raised.value)
+    assert "private-secret" not in str(raised.value)
+
+
+def test_malformed_vendor_json_is_a_safe_domain_failure() -> None:
+    class BadJsonResponse:
+        ok = True
+        status_code = 200
+        headers: dict[str, str] = {}
+
+        def json(self):
+            raise ValueError("customer@example.invalid response body")
+
+    class BadJsonSession:
+        def get(self, _url, params=None):
+            return BadJsonResponse()
+
+    client = Bill4TimeClient.__new__(Bill4TimeClient)
+    client.session = cast(requests.Session, BadJsonSession())
+    client._api_url = "https://example.invalid/keyed-secret/v1"
+    with pytest.raises(SafeToolFailure, match="unreadable response") as raised:
+        client.list_clients()
+    assert "customer@example.invalid" not in str(raised.value)
+
+
 def test_list_controls_reject_invalid_values_with_reason_only_logs(caplog) -> None:
     client, _session = _client_with_stub_session()
     with caplog.at_level(logging.WARNING):
-        with pytest.raises(ValueError, match="between 1 and 200"):
+        with pytest.raises(SafeToolFailure, match="integer from 1 to 200"):
             client._build_params(top=201)
-        with pytest.raises(ValueError, match="non-negative"):
+        with pytest.raises(SafeToolFailure, match="non-negative integer"):
             client._build_params(skip=-1)
-        with pytest.raises(ValueError, match="must not be empty"):
+        with pytest.raises(SafeToolFailure, match="non-empty string"):
             client._build_params(orderby="")
 
     assert "reason=invalid_top" in caplog.text
@@ -117,15 +166,11 @@ def test_all_list_wrappers_propagate_the_requested_order(monkeypatch) -> None:
     assert len(fake.calls) == 49
 
 
-def test_tool_rejection_log_omits_exception_message(caplog) -> None:
+def test_unexpected_tool_error_is_not_exposed_by_direct_call() -> None:
     private_value = "person@example.invalid"
 
     def reject() -> None:
         raise ValueError(private_value)
 
-    with caplog.at_level(logging.WARNING):
-        result = json.loads(server._call(reject))
-
-    assert result == {"error": private_value}
-    assert "reason=ValueError" in caplog.text
-    assert private_value not in caplog.text
+    with pytest.raises(ValueError, match="person@example.invalid"):
+        server._call(reject)

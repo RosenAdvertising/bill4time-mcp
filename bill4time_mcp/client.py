@@ -2,10 +2,10 @@
 
 import logging
 import os
-import time
 from datetime import date
 
 import requests
+from mcp.server.mcpserver.exceptions import ToolError
 
 from bill4time_mcp import credentials
 
@@ -15,17 +15,45 @@ MAX_LIST_LIMIT = 200
 DEFAULT_ORDERBY = "id desc"
 logger = logging.getLogger(__name__)
 
+
+class SafeToolFailure(ToolError):
+    """A failure with deliberately safe, client-visible guidance."""
+
+
+_SAFE_VENDOR_REASONS = {
+    "invalid_api_key": "invalid API key",
+    "unauthorized": "authorization rejected",
+    "forbidden": "access denied",
+    "not_found": "resource not found",
+    "rate_limit_exceeded": "rate limit reached",
+    "service_unavailable": "service temporarily unavailable",
+    "internal_server_error": "server error",
+}
+
+
+def _safe_vendor_reason(resp) -> str:
+    """Use only recognized generic vendor reason codes; never echo vendor text."""
+    try:
+        code = resp.json().get("code", "")
+    except (ValueError, AttributeError, TypeError):
+        code = ""
+    if isinstance(code, str):
+        return _SAFE_VENDOR_REASONS.get(code.strip().lower(), "request failed")
+    return "request failed"
+
+
 # Resolve credentials through the pluggable store (OS keyring -> .env file).
 credentials.load_into_environ(["BILL4TIME_API_KEY"])
 
 API_KEY = os.environ.get("BILL4TIME_API_KEY", "")
 
 
-def _retry_after_seconds(resp, default=10):
+def _retry_after_seconds(resp):
     try:
-        return int(resp.headers.get("Retry-After", default))
+        delay = int(resp.headers.get("Retry-After", ""))
     except (TypeError, ValueError):
-        return default
+        return None
+    return delay if 0 <= delay <= 86400 else None
 
 
 def _json_response(resp):
@@ -35,8 +63,8 @@ def _json_response(resp):
         logger.warning(
             "bill4time_response_rejected reason=non_json status=%s", resp.status_code
         )
-        raise RuntimeError(
-            f"Bill4Time API returned non-JSON response ({resp.status_code})"
+        raise SafeToolFailure(
+            "Bill4Time returned an unreadable response. Try again later."
         ) from exc
 
 
@@ -54,32 +82,64 @@ class Bill4TimeClient:
     def __init__(self):
         if not API_KEY:
             logger.error("bill4time_client_rejected reason=missing_api_key")
-            raise RuntimeError("BILL4TIME_API_KEY not set. Run bill4time-mcp-setup.")
+            raise SafeToolFailure(
+                "Missing BILL4TIME_API_KEY. Set it or run bill4time-mcp-setup."
+            )
         self.session = requests.Session()
         self.session.headers.update({"Accept": "application/json"})
         self._api_url = f"{BASE}/{API_KEY}/v1"
 
     def _get(self, resource: str, params: dict | None = None):
         url = f"{self._api_url}/{resource}"
-        for _attempt in range(3):
+        try:
             resp = self.session.get(url, params=params)
-            if resp.status_code == 429:
-                retry_after = _retry_after_seconds(resp)
-                logger.warning(
-                    "bill4time_request_delayed reason=rate_limit retry_after_seconds=%s",
-                    retry_after,
+        except requests.RequestException as exc:
+            logger.warning("bill4time_request_failed reason=transport_error")
+            raise SafeToolFailure(
+                "Bill4Time could not be reached. Check the connection and retry."
+            ) from exc
+        if resp.status_code == 429:
+            retry_after = _retry_after_seconds(resp)
+            logger.warning(
+                "bill4time_request_delayed reason=rate_limit retry_after_seconds=%s",
+                retry_after,
+            )
+            hint = (
+                f"Retry after about {retry_after} seconds."
+                if retry_after is not None
+                else "Retry later."
+            )
+            raise SafeToolFailure(f"Bill4Time rate limit reached. {hint}")
+        if not resp.ok:
+            logger.warning(
+                "bill4time_request_rejected reason=vendor_http_error status=%s",
+                resp.status_code,
+            )
+            if resp.status_code in (401, 403):
+                raise SafeToolFailure(
+                    "Bill4Time authorization was rejected or expired. Reauthorize with bill4time-mcp-setup."
                 )
-                time.sleep(retry_after)
-                continue
-            if not resp.ok:
-                logger.warning(
-                    "bill4time_request_rejected reason=vendor_http_error status=%s",
-                    resp.status_code,
+            if resp.status_code == 404:
+                raise SafeToolFailure(
+                    "Bill4Time resource was not found. Check the requested record."
                 )
-                raise RuntimeError(f"Bill4Time API error {resp.status_code}")
-            return _apply_total_cap(_json_response(resp), params)
-        logger.warning("bill4time_request_rejected reason=max_retries_exceeded")
-        raise RuntimeError("Max retries exceeded")
+            raise SafeToolFailure(
+                f"Bill4Time returned HTTP {resp.status_code}: {_safe_vendor_reason(resp)}"
+            )
+        data = _json_response(resp)
+        if (
+            isinstance(data, list)
+            and not data
+            and params
+            and len(params) == 1
+            and isinstance(params.get("$filter"), str)
+            and params["$filter"].startswith("id eq ")
+            and params["$filter"][7:].isdigit()
+        ):
+            raise SafeToolFailure(
+                "Bill4Time resource was not found. Check the requested record."
+            )
+        return _apply_total_cap(data, params)
 
     def _build_params(
         self,
@@ -92,13 +152,15 @@ class Bill4TimeClient:
     ) -> dict:
         if not 1 <= top <= MAX_LIST_LIMIT:
             logger.warning("list_request_rejected reason=invalid_top")
-            raise ValueError(f"top must be between 1 and {MAX_LIST_LIMIT}")
+            raise SafeToolFailure(
+                f"Argument top must be an integer from 1 to {MAX_LIST_LIMIT}."
+            )
         if skip < 0:
             logger.warning("list_request_rejected reason=negative_skip")
-            raise ValueError("skip must be non-negative")
+            raise SafeToolFailure("Argument skip must be a non-negative integer.")
         if not orderby.strip():
             logger.warning("list_request_rejected reason=missing_orderby")
-            raise ValueError("orderby must not be empty")
+            raise SafeToolFailure("Argument orderby must be a non-empty string.")
 
         params = {"$top": top, "$orderby": orderby}
         if filter_expr:
@@ -117,14 +179,16 @@ class Bill4TimeClient:
         return "'" + value.replace("'", "''") + "'"
 
     @staticmethod
-    def _parse_date(value: str) -> str:
+    def _parse_date(value: str, argument: str = "date") -> str:
         """Validate and normalise an ISO-8601 date string (YYYY-MM-DD).
-        Raises ValueError if the format is invalid."""
+        Raises SafeToolFailure if the format is invalid."""
         try:
             return date.fromisoformat(value).isoformat()
-        except ValueError:
+        except ValueError as exc:
             logger.warning("list_request_rejected reason=invalid_date")
-            raise
+            raise SafeToolFailure(
+                f"Argument {argument} must use YYYY-MM-DD format."
+            ) from exc
 
     # ── Clients ───────────────────────────────────────────────────────────────
 
@@ -280,8 +344,8 @@ class Bill4TimeClient:
         top: int = DEFAULT_LIST_LIMIT,
         orderby: str = DEFAULT_ORDERBY,
     ):
-        start = self._parse_date(start_date)
-        end = self._parse_date(end_date)
+        start = self._parse_date(start_date, "start_date")
+        end = self._parse_date(end_date, "end_date")
         return self._get(
             "timeEntries",
             self._build_params(
@@ -363,8 +427,8 @@ class Bill4TimeClient:
         top: int = DEFAULT_LIST_LIMIT,
         orderby: str = DEFAULT_ORDERBY,
     ):
-        start = self._parse_date(start_date)
-        end = self._parse_date(end_date)
+        start = self._parse_date(start_date, "start_date")
+        end = self._parse_date(end_date, "end_date")
         return self._get(
             "expenses",
             self._build_params(
@@ -448,8 +512,8 @@ class Bill4TimeClient:
         top: int = DEFAULT_LIST_LIMIT,
         orderby: str = DEFAULT_ORDERBY,
     ):
-        start = self._parse_date(start_date)
-        end = self._parse_date(end_date)
+        start = self._parse_date(start_date, "start_date")
+        end = self._parse_date(end_date, "end_date")
         return self._get(
             "invoices",
             self._build_params(
@@ -505,8 +569,8 @@ class Bill4TimeClient:
         top: int = DEFAULT_LIST_LIMIT,
         orderby: str = DEFAULT_ORDERBY,
     ):
-        start = self._parse_date(start_date)
-        end = self._parse_date(end_date)
+        start = self._parse_date(start_date, "start_date")
+        end = self._parse_date(end_date, "end_date")
         return self._get(
             "payments",
             self._build_params(
@@ -563,8 +627,8 @@ class Bill4TimeClient:
         top: int = DEFAULT_LIST_LIMIT,
         orderby: str = DEFAULT_ORDERBY,
     ):
-        start = self._parse_date(start_date)
-        end = self._parse_date(end_date)
+        start = self._parse_date(start_date, "start_date")
+        end = self._parse_date(end_date, "end_date")
         return self._get(
             "paymentsApplied",
             self._build_params(
@@ -624,8 +688,8 @@ class Bill4TimeClient:
         top: int = DEFAULT_LIST_LIMIT,
         orderby: str = DEFAULT_ORDERBY,
     ):
-        start = self._parse_date(start_date)
-        end = self._parse_date(end_date)
+        start = self._parse_date(start_date, "start_date")
+        end = self._parse_date(end_date, "end_date")
         return self._get(
             "contacts",
             self._build_params(
@@ -728,8 +792,8 @@ class Bill4TimeClient:
         top: int = DEFAULT_LIST_LIMIT,
         orderby: str = DEFAULT_ORDERBY,
     ):
-        start = self._parse_date(start_date)
-        end = self._parse_date(end_date)
+        start = self._parse_date(start_date, "start_date")
+        end = self._parse_date(end_date, "end_date")
         return self._get(
             "trustAccounting",
             self._build_params(
