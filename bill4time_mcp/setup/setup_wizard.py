@@ -22,7 +22,8 @@ def test_api_key(api_key: str) -> dict:
     )
     if resp.status_code == 200:
         return resp.json()
-    logger.warning(
+    # Fixed event label and HTTP status only; no API key value is logged.
+    logger.warning(  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
         "setup_api_key_rejected reason=vendor_http_error status=%s", resp.status_code
     )
     raise RuntimeError(f"API test failed ({resp.status_code})")

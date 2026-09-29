@@ -18,7 +18,10 @@ def main():
         count = len(users) if isinstance(users, list) else "OK"
         print(f"✓ Connected. Users returned: {count}")
     except (RuntimeError, ValueError, requests.RequestException) as e:
-        logger.warning("credential_verification_rejected reason=%s", type(e).__name__)
+        # Fixed event label and exception class name only; no credential is logged.
+        logger.warning(  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+            "credential_verification_rejected reason=%s", type(e).__name__
+        )
         print(f"✗ Verification failed: {e}")
         sys.exit(1)
 

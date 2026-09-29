@@ -6,9 +6,10 @@ import asyncio
 import inspect
 import json
 import logging
-from typing import Any
+from typing import Any, cast
 
 import pytest
+import requests
 
 from bill4time_mcp import server
 from bill4time_mcp.client import Bill4TimeClient
@@ -35,7 +36,7 @@ class StubSession:
 def _client_with_stub_session() -> tuple[Bill4TimeClient, StubSession]:
     client = Bill4TimeClient.__new__(Bill4TimeClient)
     session = StubSession()
-    client.session = session
+    client.session = cast(requests.Session, session)
     client._api_url = "https://example.invalid/redacted/v1"
     return client, session
 
