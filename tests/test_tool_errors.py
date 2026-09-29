@@ -39,6 +39,7 @@ def dispatch(name="list_clients", arguments=None):
 @pytest.mark.parametrize(
     ("status", "payload", "retry", "message"),
     [
+        (302, {"message": PRIVATE}, None, "Bill4Time returned HTTP 302: request failed"),
         (
             401,
             {"message": PRIVATE},
@@ -293,7 +294,7 @@ def test_setup_no_credential_and_bad_key_exit_without_traceback(
     assert PRIVATE not in output
     assert "bad-key" not in output
     assert "bad-key" not in caplog.text
-    assert calls[0][1]["timeout"] == 15
+    assert calls[0][1]["timeout"] == client_module.REQUEST_TIMEOUT
     assert "bad-key" in calls[0][0]
 
 
@@ -338,7 +339,7 @@ def test_api_key_path_is_escaped(monkeypatch):
     monkeypatch.setattr(requests, "get", response)
     setup_wizard.test_api_key("../x")
     assert calls[0][0].endswith("/..%2Fx/v1/users")
-    assert calls[0][1]["timeout"] == 15
+    assert calls[0][1]["timeout"] == client_module.REQUEST_TIMEOUT
     assert calls[0][1]["allow_redirects"] is False
     monkeypatch.setattr(client_module, "API_KEY", "../x")
     assert client_module.Bill4TimeClient()._api_url.endswith("/..%2Fx/v1")

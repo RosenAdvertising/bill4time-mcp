@@ -9,7 +9,7 @@ from urllib.parse import quote
 import requests
 
 from bill4time_mcp import credentials
-from bill4time_mcp.client import SafeToolFailure
+from bill4time_mcp.client import REQUEST_TIMEOUT, SafeToolFailure
 
 BASE = "https://secure.bill4time.com/b4t-api"
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ def test_api_key(api_key: str) -> dict:
         url,
         headers={"Accept": "application/json"},
         params={"$top": 1},
-        timeout=15,
+        timeout=REQUEST_TIMEOUT,
         allow_redirects=False,
     )
     if resp.status_code == 200:
