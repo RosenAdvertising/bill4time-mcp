@@ -35,10 +35,12 @@ production deployment behavior. In particular, the dynamic list-wrapper stub
 checks forwarding but cannot prove that every wrapper selects the intended
 client method.
 
-## Open product decision
+## Public error behavior
 
-MCP 2.2.0 masks exception messages from tool handlers unless they raise
-`ToolError` or `ResourceError`. Retaining this masking limits information
-leakage; explicitly safe `ToolError` messages could give clients more actionable
-feedback. Toby should choose the policy. Existing exception handling is
-unchanged.
+Tool calls return `isError=true` for classified failures. The server exposes
+only fixed, actionable messages for known configuration, authorization,
+not-found, rate-limit, transport, and input-validation failures. Unexpected
+exceptions are masked as `Error executing tool <name>`. Resource reads use
+classified safe messages when available and a fixed generic message otherwise.
+Raw exception details, vendor response bodies, request URLs, and credentials are
+not returned to clients or written to stderr.

@@ -28,7 +28,9 @@ class StubSession:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, Any] | None]] = []
 
-    def get(self, url: str, params: dict[str, Any] | None = None) -> StubResponse:
+    def get(
+        self, url: str, params: dict[str, Any] | None = None, **kwargs
+    ) -> StubResponse:
         self.calls.append((url, params))
         return StubResponse()
 
@@ -46,7 +48,7 @@ class ErrorResponse:
 
 
 class ErrorSession:
-    def get(self, _url, params=None):
+    def get(self, _url, params=None, **kwargs):
         return ErrorResponse()
 
 
@@ -88,7 +90,7 @@ def test_malformed_vendor_json_is_a_safe_domain_failure() -> None:
             raise ValueError("customer@example.invalid response body")
 
     class BadJsonSession:
-        def get(self, _url, params=None):
+        def get(self, _url, params=None, **kwargs):
             return BadJsonResponse()
 
     client = Bill4TimeClient.__new__(Bill4TimeClient)

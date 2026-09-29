@@ -1,8 +1,11 @@
 """Bill4Time API client. API key embedded in URL path. Read-only OData API."""
 
 import logging
+import math
 import os
+import re
 from datetime import date
+from urllib.parse import quote
 
 import requests
 from mcp.server.mcpserver.exceptions import ToolError
@@ -13,6 +16,7 @@ BASE = "https://secure.bill4time.com/b4t-api"
 DEFAULT_LIST_LIMIT = 50
 MAX_LIST_LIMIT = 200
 DEFAULT_ORDERBY = "id desc"
+REQUEST_TIMEOUT = 30
 logger = logging.getLogger(__name__)
 
 
@@ -50,10 +54,13 @@ API_KEY = os.environ.get("BILL4TIME_API_KEY", "")
 
 def _retry_after_seconds(resp):
     try:
-        delay = int(resp.headers.get("Retry-After", ""))
-    except (TypeError, ValueError):
+        raw = resp.headers.get("Retry-After", "")
+        if not re.fullmatch(r"\s*\d+(?:\.\d+)?\s*", str(raw)):
+            return None
+        delay = float(raw)
+    except (TypeError, ValueError, OverflowError):
         return None
-    return delay if 0 <= delay <= 86400 else None
+    return delay if math.isfinite(delay) and delay >= 0 else None
 
 
 def _json_response(resp):
@@ -83,20 +90,20 @@ class Bill4TimeClient:
         if not API_KEY:
             logger.error("bill4time_client_rejected reason=missing_api_key")
             raise SafeToolFailure(
-                "Missing BILL4TIME_API_KEY. Set it or run bill4time-mcp-setup."
+                "Missing BILL4TIME_API_KEY. Set it or run bill4time-mcp-setup. Restart the MCP server after setup."
             )
         self.session = requests.Session()
         self.session.headers.update({"Accept": "application/json"})
-        self._api_url = f"{BASE}/{API_KEY}/v1"
+        self._api_url = f"{BASE}/{quote(str(API_KEY), safe='')}/v1"
 
     def _get(self, resource: str, params: dict | None = None):
-        url = f"{self._api_url}/{resource}"
+        url = f"{self._api_url}/{quote(str(resource), safe='')}"
         try:
-            resp = self.session.get(url, params=params)
+            resp = self.session.get(url, params=params, timeout=REQUEST_TIMEOUT)
         except requests.RequestException as exc:
             logger.warning("bill4time_request_failed reason=transport_error")
             raise SafeToolFailure(
-                "Bill4Time could not be reached. Check the connection and retry."
+                "Bill4Time read failed because the connection timed out or was unavailable. Check the connection and retry."
             ) from exc
         if resp.status_code == 429:
             retry_after = _retry_after_seconds(resp)
@@ -105,7 +112,7 @@ class Bill4TimeClient:
                 retry_after,
             )
             hint = (
-                f"Retry after about {retry_after} seconds."
+                f"Retry after {retry_after:g} seconds."
                 if retry_after is not None
                 else "Retry later."
             )
@@ -115,9 +122,13 @@ class Bill4TimeClient:
                 "bill4time_request_rejected reason=vendor_http_error status=%s",
                 resp.status_code,
             )
-            if resp.status_code in (401, 403):
+            if resp.status_code == 401:
                 raise SafeToolFailure(
                     "Bill4Time authorization was rejected or expired. Reauthorize with bill4time-mcp-setup."
+                )
+            if resp.status_code == 403:
+                raise SafeToolFailure(
+                    "Bill4Time access denied: the connected account lacks permission for this action (or the authorization expired; re-run bill4time-mcp-setup if so)."
                 )
             if resp.status_code == 404:
                 raise SafeToolFailure(

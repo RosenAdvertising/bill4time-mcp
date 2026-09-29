@@ -2,12 +2,15 @@
 
 import json
 import logging
-from typing import Annotated, Any, cast
+from typing import Annotated
 
 from mcp.server.mcpserver import MCPServer
-from mcp.server.mcpserver.context import Context
-from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
-from mcp.shared.exceptions import MCPError
+from mcp.server.mcpserver.exceptions import (
+    ResourceError,
+    ResourceNotFoundError,
+    ToolError,
+    UnexpectedToolError,
+)
 from mcp_types import CallToolResult, TextContent
 from pydantic import Field, ValidationError
 
@@ -25,47 +28,59 @@ logger = logging.getLogger(__name__)
 class SafeMCPServer(MCPServer):
     """Keep the SDK's schemas while sanitizing its tool error boundary."""
 
-    async def _handle_call_tool(self, ctx, params):
-        context = Context(
-            request_context=ctx,
-            mcp_server=self,
-            input_params=params,
-            subscriptions=self._subscriptions,
-        )
+    async def call_tool(self, name, arguments, context=None):
         try:
-            return await self.call_tool(params.name, params.arguments or {}, context)
-        except MCPError:
-            raise
+            return await super().call_tool(name, arguments, context)
         except Exception as exc:
-            if isinstance(exc, ToolError) and not isinstance(exc, UnexpectedToolError):
-                cause = exc.__cause__
-                if isinstance(cause, SafeToolFailure):
-                    text = str(exc)
-                    logger.info("tool_call_failed reason=expected_failure")
-                elif isinstance(cause, ValidationError):
+            cause = exc.__cause__
+            if isinstance(cause, SafeToolFailure) and not isinstance(
+                exc, UnexpectedToolError
+            ):
+                text = f"Error executing tool {name}: {cause}"
+                logger.info("tool_call_failed reason=expected_failure")
+            elif (
+                isinstance(exc, ToolError)
+                and not isinstance(exc, UnexpectedToolError)
+                and isinstance(cause, ValidationError)
+            ):
+                try:
                     fields = sorted(
                         {
                             str(e["loc"][0]) if e["loc"] else "argument"
-                            for e in cast(Any, cause).errors()
+                            for e in cause.errors()
                         }
                     )
-                    tool = self._tool_manager.get_tool(params.name)
+                    tool = self._tool_manager.get_tool(name)
                     properties = tool.parameters.get("properties", {}) if tool else {}
                     field_name = (
                         fields[0] if fields and fields[0] in properties else "argument"
                     )
-                    shape = _argument_shape(params.name, field_name)
-                    text = f"Error executing tool {params.name}: Argument {field_name} {shape}."
+                    shape = _argument_shape(name, field_name)
+                    text = (
+                        f"Error executing tool {name}: Argument {field_name} {shape}."
+                    )
                     logger.info("tool_call_failed reason=invalid_arguments")
-                else:
-                    text = f"Error executing tool {params.name}"
+                except Exception:
+                    text = f"Error executing tool {name}"
                     logger.error("tool_call_failed reason=unexpected_exception")
             else:
-                text = f"Error executing tool {params.name}"
+                text = f"Error executing tool {name}"
                 logger.error("tool_call_failed reason=unexpected_exception")
             return CallToolResult(
                 content=[TextContent(type="text", text=text)], is_error=True
             )
+
+    async def read_resource(self, uri, context=None):
+        """Keep SDK resource wrapper exceptions and their chains out of logs/output."""
+        try:
+            return await super().read_resource(uri, context)
+        except ResourceNotFoundError:
+            raise ResourceNotFoundError("Bill4Time resource was not found.") from None
+        except Exception as exc:
+            cause = exc.__cause__
+            if isinstance(cause, SafeToolFailure):
+                raise ResourceError(str(cause)) from None
+            raise ResourceError("Error reading resource") from None
 
 
 def _argument_shape(tool_name: str, field_name: str) -> str:

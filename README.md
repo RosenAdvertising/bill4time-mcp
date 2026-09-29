@@ -44,6 +44,9 @@ bill4time-mcp-setup
 
 This prompts for your API key and tests the connection.
 
+After changing the API key, restart the MCP server or client session so the
+new key is loaded.
+
 Verify:
 
 ```bash
