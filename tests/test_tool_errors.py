@@ -39,7 +39,12 @@ def dispatch(name="list_clients", arguments=None):
 @pytest.mark.parametrize(
     ("status", "payload", "retry", "message"),
     [
-        (302, {"message": PRIVATE}, None, "Bill4Time returned HTTP 302: request failed"),
+        (
+            302,
+            {"message": PRIVATE},
+            None,
+            "Bill4Time returned HTTP 302: request failed",
+        ),
         (
             401,
             {"message": PRIVATE},
@@ -168,7 +173,7 @@ def test_path_segment_is_quoted_without_encoding_whole_path():
     assert session.calls[0][0].endswith("/..%2Fx")
 
 
-def test_redirect_response_is_not_reported_as_success():
+def test_redirect_response_is_not_reported_as_success(monkeypatch):
     client, session = _client_with_stub_session()
 
     class RedirectResponse:
@@ -183,7 +188,7 @@ def test_redirect_response_is_not_reported_as_success():
         assert kwargs["allow_redirects"] is False
         return RedirectResponse()
 
-    session.get = redirect
+    monkeypatch.setattr(session, "get", redirect)
     with pytest.raises(SafeToolFailure) as raised:
         client.list_clients()
     assert str(raised.value) == "Bill4Time returned HTTP 302: request failed"
