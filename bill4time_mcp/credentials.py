@@ -28,6 +28,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from bill4time_mcp.private_file import write_private_file
+
 logger = logging.getLogger(__name__)
 
 # --- per-MCP configuration --------------------------------------------------
@@ -96,20 +98,15 @@ def _read_env_file() -> dict[str, str]:
 
 
 def _write_env_file(values: dict[str, str]) -> None:
-    """Write the fallback ``.env`` file with 0600 perms in a 0700 dir."""
+    """Atomically write credentials with platform-specific private storage."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    try:
-        CONFIG_DIR.chmod(0o700)
-    except OSError:
-        logger.warning("credential_permissions_not_applied target=config_directory")
+    if os.name != "nt":
+        try:
+            CONFIG_DIR.chmod(0o700)
+        except OSError:
+            logger.warning("credential_permissions_not_applied target=config_directory")
     lines = [f"{k}={v}" for k, v in values.items()]
-    fd = os.open(ENV_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as env_file:
-        env_file.write("\n".join(lines) + ("\n" if lines else ""))
-    try:
-        ENV_FILE.chmod(0o600)
-    except OSError:
-        logger.warning("credential_permissions_not_applied target=env_file")
+    write_private_file(ENV_FILE, "\n".join(lines) + ("\n" if lines else ""))
 
 
 def get_secret(key: str, default: str = "") -> str:

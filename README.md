@@ -71,6 +71,10 @@ disk in clear text.
 without Secret Service), or if you set `BILL4TIME_MCP_USE_KEYRING=0`, the key
 falls back to a `~/.bill4time-mcp/.env` file with `0600` permissions.
 
+On Windows, the file is stored in the user's profile and protected by Windows'
+default per-user access rules. On POSIX, files are created with `0600` permissions
+and writes fail closed if private permissions cannot be established.
+
 **Read order.** The key resolves in the order OS keyring → process environment →
 `.env` file. So a rotated key in the keyring always wins, and a
 `BILL4TIME_API_KEY` exported in your shell overrides the file fallback without
