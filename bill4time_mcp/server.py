@@ -111,7 +111,7 @@ mcp = SafeMCPServer(
         "expenses, invoices, payments, contacts, and trust accounting. "
         "Supports OData-style filtering on all resources."
     ),
-    version="0.2.0",
+    version="0.3.0",
 )
 
 _client: Bill4TimeClient | None = None
