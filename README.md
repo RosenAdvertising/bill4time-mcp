@@ -19,11 +19,12 @@ MCP server for [Bill4Time](https://bill4time.com) — API coverage for legal bil
 - **Contacts** — list by status, date range, contact connections
 - **Trust Accounting** — list trust records by client, project, date range
 
-All resources support OData-style filtering via `filter_expr` parameter for advanced queries.
+General collection list tools support OData-style filtering via `filter_expr` for advanced queries.
 
 ## Requirements
 
 - Python 3.10+
+- Python MCP SDK >=2.2,<3
 - Claude Desktop (or any MCP-compatible client)
 - Bill4Time API key (create in Settings → API tab)
 
@@ -42,6 +43,9 @@ bill4time-mcp-setup
 ```
 
 This prompts for your API key and tests the connection.
+
+After changing the API key, restart the MCP server or client session so the
+new key is loaded.
 
 Verify:
 
@@ -66,6 +70,10 @@ disk in clear text.
 **File fallback.** On a host with no keyring backend (e.g. a headless Linux box
 without Secret Service), or if you set `BILL4TIME_MCP_USE_KEYRING=0`, the key
 falls back to a `~/.bill4time-mcp/.env` file with `0600` permissions.
+
+On Windows, the file is stored in the user's profile and protected by Windows'
+default per-user access rules. On POSIX, files are created with `0600` permissions
+and writes fail closed if private permissions cannot be established.
 
 **Read order.** The key resolves in the order OS keyring → process environment →
 `.env` file. So a rotated key in the keyring always wins, and a
@@ -102,7 +110,7 @@ No OAuth or token refresh required. Create API keys from **Settings → API** in
 
 ## OData Filtering
 
-All `list_*` tools accept a `filter_expr` parameter for advanced filtering:
+General collection list tools accept a `filter_expr` parameter for advanced filtering:
 
 ```text
 "status eq 'Active'"
@@ -113,7 +121,10 @@ All `list_*` tools accept a `filter_expr` parameter for advanced filtering:
 
 Supported operators: `eq`, `ne`, `gt`, `ge`, `lt`, `le`
 
-Use `top` to limit results, `orderby` to sort, `skip` for pagination.
+Every list tool defaults to 50 records and an explicit deterministic sort
+(`id desc`, except the alphabetical open-project view). Use `top` to choose a
+total result cap from 1 through 200, `orderby` to override the sort, and `skip`
+for pagination on the general collection tools.
 
 ## Example usage in Claude
 
@@ -129,7 +140,7 @@ Use `top` to limit results, `orderby` to sort, `skip` for pagination.
 
 ## Security note
 
-**API key in URL path.** Bill4Time's API design embeds the API key directly as a path segment in every request URL (`/b4t-api/{api_key}/v1/...`). This is a Bill4Time API architecture constraint — the MCP loads your key from a local env file and never commits it to this repository. However, the key-in-URL design has the following implications you should be aware of:
+**API key in URL path.** Bill4Time's API design embeds the API key directly as a path segment in every request URL (`/b4t-api/{api_key}/v1/...`). This is a Bill4Time API architecture constraint. The MCP resolves the key from the OS keyring, process environment, or a local file fallback; it never logs the key. However, the key-in-URL design has the following implications you should be aware of:
 
 - **Server/proxy access logs** on any machine between your client and Bill4Time's servers will record the full request URL, including the API key, for the duration of their log retention policy.
 - **Network monitoring tools** that capture request URLs (e.g. HTTP proxies, security appliances, debugging tools) will expose the key in logged URLs.
