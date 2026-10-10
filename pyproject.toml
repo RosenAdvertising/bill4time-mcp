@@ -20,7 +20,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.0.3,<10",
-    "ruff==0.16.10",
+    "ruff==0.17.0",
 ]
 
 [project.scripts]
