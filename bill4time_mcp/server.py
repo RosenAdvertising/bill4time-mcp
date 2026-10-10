@@ -1,7 +1,11 @@
 """Bill4Time MCP server — MCPServer tools for the Bill4Time API."""
 
+import asyncio
 import json
 import logging
+import os
+import threading
+from importlib.metadata import version as package_version
 from typing import Annotated
 
 from mcp.server.mcpserver import MCPServer
@@ -11,8 +15,10 @@ from mcp.server.mcpserver.exceptions import (
     ToolError,
     UnexpectedToolError,
 )
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp_types import CallToolResult, TextContent
 from pydantic import Field, ValidationError
+from starlette.applications import Starlette
 
 from bill4time_mcp.client import (
     DEFAULT_LIST_LIMIT,
@@ -23,6 +29,9 @@ from bill4time_mcp.client import (
 )
 
 logger = logging.getLogger(__name__)
+
+STREAMABLE_HTTP_TRANSPORT = "streamable-http"
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
 class SafeMCPServer(MCPServer):
@@ -104,30 +113,41 @@ def _argument_shape(tool_name: str, field_name: str) -> str:
 ListLimit = Annotated[int, Field(ge=1, le=MAX_LIST_LIMIT)]
 ListOffset = Annotated[int, Field(ge=0)]
 
+
+def _package_version() -> str:
+    return package_version("bill4time-mcp")
+
+
 mcp = SafeMCPServer(
     "bill4time",
+    title="Bill4Time",
     instructions=(
         "Bill4Time legal billing. Read-only access to clients, projects, time entries, "
         "expenses, invoices, payments, contacts, and trust accounting. "
         "Supports OData-style filtering on all resources."
     ),
-    version="0.3.0",
+    version=_package_version(),
 )
 
 _client: Bill4TimeClient | None = None
+# requests.Session is not safe for overlapping calls. Stdio is one caller;
+# stateless HTTP can overlap, so vendor calls take turns on the shared client.
+_client_lock = threading.Lock()
 
 
 def _c() -> Bill4TimeClient:
     """Return a cached Bill4TimeClient instance (one session, one connection pool)."""
     global _client
-    if _client is None:
-        _client = Bill4TimeClient()
-    return _client
+    with _client_lock:
+        if _client is None:
+            _client = Bill4TimeClient()
+        return _client
 
 
 def _call(fn, *args, **kwargs) -> str:
     """Invoke a client method; expected failures are safe MCP tool errors."""
-    return json.dumps(fn(*args, **kwargs), indent=2)
+    with _client_lock:
+        return json.dumps(fn(*args, **kwargs), indent=2)
 
 
 # ── Clients ────────────────────────────────────────────────────────────────────
@@ -847,8 +867,79 @@ def trust_account_review(client_id: int) -> str:
 6. Output: transaction log table, current trust balance, any compliance flags."""
 
 
+def _requested_transport() -> str:
+    return os.environ.get("BILL4TIME_MCP_TRANSPORT", "stdio").strip().lower() or "stdio"
+
+
+def _host() -> str:
+    return os.environ.get("BILL4TIME_MCP_HOST", "127.0.0.1").strip() or "127.0.0.1"
+
+
+def _port() -> int:
+    raw = os.environ.get("PORT", "8080").strip()
+    try:
+        return int(raw)
+    except ValueError:
+        raise SystemExit(f"PORT must be an integer, got {raw!r}") from None
+
+
+def _csv_env(name: str) -> list[str]:
+    return [
+        item.strip() for item in os.environ.get(name, "").split(",") if item.strip()
+    ]
+
+
+def _transport_security() -> TransportSecuritySettings | None:
+    host = _host()
+    if host in _LOOPBACK_HOSTS:
+        return None
+    allowed_hosts = _csv_env("BILL4TIME_MCP_ALLOWED_HOSTS")
+    if not allowed_hosts:
+        raise SystemExit(
+            "BILL4TIME_MCP_ALLOWED_HOSTS is required when BILL4TIME_MCP_HOST "
+            f"is {host!r} (not a loopback address)."
+        )
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=allowed_hosts,
+        allowed_origins=_csv_env("BILL4TIME_MCP_ALLOWED_ORIGINS"),
+    )
+
+
+def create_serve_app() -> Starlette:
+    return mcp.streamable_http_app(
+        streamable_http_path="/mcp",
+        host=_host(),
+        stateless_http=True,
+        transport_security=_transport_security(),
+    )
+
+
+async def _serve_streamable_http() -> None:
+    import uvicorn
+
+    config = uvicorn.Config(
+        create_serve_app(),
+        host=_host(),
+        port=_port(),
+        log_level=mcp.settings.log_level.lower(),
+        access_log=False,
+    )
+    await uvicorn.Server(config).serve()
+
+
 def main():
-    mcp.run()
+    transport = _requested_transport()
+    if transport == "stdio":
+        mcp.run()
+        return
+    if transport == STREAMABLE_HTTP_TRANSPORT:
+        asyncio.run(_serve_streamable_http())
+        return
+    raise SystemExit(
+        "Unsupported BILL4TIME_MCP_TRANSPORT "
+        f"{transport!r}; expected 'stdio' or '{STREAMABLE_HTTP_TRANSPORT}'."
+    )
 
 
 if __name__ == "__main__":

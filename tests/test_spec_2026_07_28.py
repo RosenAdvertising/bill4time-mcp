@@ -126,6 +126,7 @@ def test_modern_discovery_is_sessionless_and_matches_server_capabilities() -> No
     assert "extensions" not in result["capabilities"]
     assert result["_meta"][SERVER_INFO_META_KEY] == {
         "name": "bill4time",
+        "title": "Bill4Time",
         "version": "0.3.0",
     }
 

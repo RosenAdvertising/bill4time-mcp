@@ -24,7 +24,7 @@ General collection list tools support OData-style filtering via `filter_expr` fo
 ## Requirements
 
 - Python 3.10+
-- Python MCP SDK >=2.2,<3
+- Python MCP SDK >=2.3,<3
 - Claude Desktop (or any MCP-compatible client)
 - Bill4Time API key (create in Settings → API tab)
 
@@ -97,6 +97,25 @@ an encrypted file backend, or a cloud backend, then select it with the standard
   }
 }
 ```
+
+## HTTP mode
+
+Stdio, above, stays the default. Set `BILL4TIME_MCP_TRANSPORT=streamable-http` to serve MCP 2026-07-28 as stateless Streamable HTTP. Clients POST to `/mcp`.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `BILL4TIME_MCP_TRANSPORT` | `stdio` | `stdio` or `streamable-http` |
+| `BILL4TIME_MCP_HOST` | `127.0.0.1` | Bind address. A non-loopback host requires `BILL4TIME_MCP_ALLOWED_HOSTS` |
+| `PORT` | `8080` | Bind port. Must be an integer |
+| `BILL4TIME_MCP_ALLOWED_HOSTS` | unset | Comma-separated `Host` values allowed when the bind address is not loopback |
+| `BILL4TIME_MCP_ALLOWED_ORIGINS` | unset | Optional comma-separated `Origin` values allowed with a non-loopback host |
+| `BILL4TIME_API_KEY` | unset | Bill4Time API key. Same variable stdio already reads; never taken from the request |
+
+```bash
+BILL4TIME_MCP_TRANSPORT=streamable-http PORT=8080 bill4time-mcp
+```
+
+The server listens on `http://127.0.0.1:8080/mcp`. On loopback, host checks are the SDK's own. For any other bind address, set `BILL4TIME_MCP_ALLOWED_HOSTS` (and `BILL4TIME_MCP_ALLOWED_ORIGINS` when browsers send `Origin`).
 
 ## Authentication Notes
 
