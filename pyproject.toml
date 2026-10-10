@@ -5,11 +5,22 @@ build-backend = "hatchling.build"
 [project]
 name = "bill4time-mcp"
 version = "0.3.0"
-description = "MCP server for Bill4Time API — legal billing and time tracking"
+description = "MCP server for Bill4Time: read-only billing, time and trust data."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 keywords = ["bill4time", "mcp", "legal", "billing", "time-tracking", "claude"]
+classifiers = [
+    "Intended Audience :: Legal Industry",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business",
+]
 dependencies = [
     "mcp>=2.3,<3",
     "pydantic>=2.12,<3",
@@ -30,6 +41,7 @@ bill4time-mcp-verify = "bill4time_mcp.cli:verify_main"
 
 [project.urls]
 Homepage = "https://github.com/RosenAdvertising/bill4time-mcp"
+Repository = "https://github.com/RosenAdvertising/bill4time-mcp"
 Issues = "https://github.com/RosenAdvertising/bill4time-mcp/issues"
 
 [tool.hatch.build.targets.wheel]
