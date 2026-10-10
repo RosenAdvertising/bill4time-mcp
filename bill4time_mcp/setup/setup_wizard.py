@@ -1,6 +1,5 @@
 """Bill4Time MCP setup — API key configuration."""
 
-import json
 import logging
 import sys
 from getpass import getpass
@@ -12,6 +11,16 @@ from bill4time_mcp import credentials
 from bill4time_mcp.client import REQUEST_TIMEOUT, SafeToolFailure
 
 BASE = "https://secure.bill4time.com/b4t-api"
+# Same configuration as the README's "Usage with Claude Desktop" section.
+CLAUDE_DESKTOP_CONFIG = """\
+{
+  "mcpServers": {
+    "bill4time": {
+      "command": "uv",
+      "args": ["run", "--locked", "--directory", "/absolute/path/to/bill4time-mcp", "bill4time-mcp"]
+    }
+  }
+}"""
 logger = logging.getLogger(__name__)
 
 
@@ -80,10 +89,11 @@ def main():
         print(f"✓ API key saved to {credentials.ENV_FILE} (0600).")
     print()
     print("Add to your Claude Desktop config:")
+    print(CLAUDE_DESKTOP_CONFIG)
+    print()
     print(
-        json.dumps(
-            {"mcpServers": {"bill4time": {"command": "bill4time-mcp"}}}, indent=2
-        )
+        "Replace /absolute/path/to/bill4time-mcp with the path of your clone, "
+        "then restart Claude Desktop."
     )
 
 

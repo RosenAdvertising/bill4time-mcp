@@ -12,6 +12,11 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from bill4time_mcp import credentials
 
+# The API key is part of every request URL path. urllib3 logs that path at DEBUG, and at
+# WARNING for a header-parse failure (connection.py "Failed to parse headers (url=...)"),
+# so keep its loggers quiet below ERROR.
+logging.getLogger("urllib3").setLevel(logging.ERROR)
+
 BASE = "https://secure.bill4time.com/b4t-api"
 DEFAULT_LIST_LIMIT = 50
 MAX_LIST_LIMIT = 200
