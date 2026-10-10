@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import threading
+from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
 from typing import Annotated
 
@@ -20,6 +21,7 @@ from mcp_types import CallToolResult, TextContent
 from pydantic import Field, ValidationError
 from starlette.applications import Starlette
 
+import bill4time_mcp
 from bill4time_mcp.client import (
     DEFAULT_LIST_LIMIT,
     DEFAULT_ORDERBY,
@@ -115,7 +117,11 @@ ListOffset = Annotated[int, Field(ge=0)]
 
 
 def _package_version() -> str:
-    return package_version("bill4time-mcp")
+    """Distribution version; falls back when imported from a bare checkout."""
+    try:
+        return package_version("bill4time-mcp")
+    except PackageNotFoundError:
+        return getattr(bill4time_mcp, "__version__", "0.0.0+local")
 
 
 mcp = SafeMCPServer(

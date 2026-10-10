@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import subprocess
+import sys
+import textwrap
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -102,6 +106,18 @@ def test_default_transport_is_stdio(monkeypatch: pytest.MonkeyPatch) -> None:
     assert called == ["stdio"]
 
 
+def test_empty_transport_selects_stdio(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A set-but-empty or whitespace transport starts stdio exactly as at BASE."""
+    monkeypatch.setenv("BILL4TIME_MCP_TRANSPORT", "")
+    assert server._requested_transport() == "stdio"
+    called: list[str] = []
+    monkeypatch.setattr(server.mcp, "run", lambda: called.append("stdio"))
+    server.main()
+    assert called == ["stdio"]
+    monkeypatch.setenv("BILL4TIME_MCP_TRANSPORT", "   ")
+    assert server._requested_transport() == "stdio"
+
+
 def test_bogus_transport_names_both_options(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BILL4TIME_MCP_TRANSPORT", "bogus")
     with pytest.raises(SystemExit) as raised:
@@ -127,10 +143,57 @@ def test_non_loopback_host_without_allowed_hosts_exits(
     assert "BILL4TIME_MCP_ALLOWED_HOSTS" in str(raised.value)
 
 
+def test_empty_host_yields_loopback_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A set-but-empty or whitespace host resolves to 127.0.0.1, never ""."""
+    monkeypatch.setenv("BILL4TIME_MCP_HOST", "")
+    assert server._host() == "127.0.0.1"
+    monkeypatch.setenv("BILL4TIME_MCP_HOST", "  ")
+    assert server._host() == "127.0.0.1"
+
+
+def test_uppercase_localhost_is_not_loopback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The loopback check is exact; LOCALHOST is a non-loopback bind address."""
+    monkeypatch.setenv("BILL4TIME_MCP_HOST", "LOCALHOST")
+    with pytest.raises(SystemExit) as raised:
+        server.create_serve_app()
+    assert "BILL4TIME_MCP_ALLOWED_HOSTS" in str(raised.value)
+
+
 def test_server_identity_is_present() -> None:
     assert server.mcp.name == "bill4time"
     assert server.mcp.title
     assert server.mcp.version
+
+
+def test_import_survives_uninstalled_distribution() -> None:
+    """Importing the server from a checkout without the dist must not raise."""
+    probe = textwrap.dedent(
+        """
+        import importlib.metadata as md
+
+        real_version = md.version
+
+        def version(name):
+            if name == "bill4time-mcp":
+                raise md.PackageNotFoundError(name)
+            return real_version(name)
+
+        md.version = version
+        import bill4time_mcp.server as server
+
+        assert server.mcp.version == "0.0.0+local", server.mcp.version
+        """
+    )
+    env = dict(os.environ)
+    env["PYTHON_KEYRING_BACKEND"] = "keyring.backends.null.Keyring"
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_lifespan_runs_once_for_the_app_not_per_request() -> None:
