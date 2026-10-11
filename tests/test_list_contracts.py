@@ -101,6 +101,24 @@ def test_malformed_vendor_json_is_a_safe_domain_failure() -> None:
     assert "customer@example.invalid" not in str(raised.value)
 
 
+def test_transport_error_does_not_chain_the_keyed_url() -> None:
+    class ConnectionErrorSession:
+        def get(self, url, params=None, **kwargs):
+            raise requests.ConnectionError(f"Max retries exceeded with url: {url}")
+
+    client = Bill4TimeClient.__new__(Bill4TimeClient)
+    client.session = cast(requests.Session, ConnectionErrorSession())
+    client._api_url = "https://example.invalid/keyed-secret-4242/v1"
+    with pytest.raises(
+        SafeToolFailure, match="connection timed out or was unavailable"
+    ) as raised:
+        client.list_clients()
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__ is True
+    assert "keyed-secret-4242" not in str(raised.value)
+    assert "keyed-secret-4242" not in repr(raised.value)
+
+
 def test_list_controls_reject_invalid_values_with_reason_only_logs(caplog) -> None:
     client, _session = _client_with_stub_session()
     with caplog.at_level(logging.WARNING):

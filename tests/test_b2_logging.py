@@ -12,6 +12,7 @@ import logging
 import re
 import socket
 import threading
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -140,11 +141,13 @@ def test_connection_error_does_not_expose_api_key(vendor, monkeypatch, caplog):
     with pytest.raises(SafeToolFailure) as raised:
         client.list_users(top=1)
 
-    # requests puts the URL path, and so the key, in its own exception text.
-    assert isinstance(raised.value.__cause__, requests.ConnectionError)
-    assert FAKE_KEY in str(raised.value.__cause__)
+    # requests puts the URL path, and so the key, in its own exception text,
+    # so the safe error is raised without chaining that exception.
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__ is True
     assert FAKE_KEY not in str(raised.value)
     assert FAKE_KEY not in _log_text(caplog)
+    assert FAKE_KEY not in "".join(traceback.format_exception(raised.value))
 
 
 def test_tool_call_over_connection_error_does_not_expose_api_key(

@@ -107,11 +107,11 @@ class Bill4TimeClient:
             resp = self.session.get(
                 url, params=params, timeout=REQUEST_TIMEOUT, allow_redirects=False
             )
-        except requests.RequestException as exc:
+        except requests.RequestException:
             logger.warning("bill4time_request_failed reason=transport_error")
             raise SafeToolFailure(
                 "Bill4Time read failed because the connection timed out or was unavailable. Check the connection and retry."
-            ) from exc
+            ) from None
         if resp.status_code == 429:
             retry_after = _retry_after_seconds(resp)
             logger.warning(
